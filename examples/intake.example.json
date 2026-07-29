@@ -1,0 +1,11 @@
+{
+  "marketplace": "US",
+  "product_stage": "launch",
+  "monthly_sales_target": 300,
+  "product_price_usd": 32.99,
+  "target_tacos_percent": 15,
+  "ad_sales_share_percent": 80,
+  "benchmark_cpc_usd": 1.2,
+  "benchmark_cvr_percent": 10,
+  "business_goals": "Validate core keywords before scaling budget."
+}

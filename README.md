@@ -24,6 +24,18 @@
 python3 -m unittest discover -s tests -v
 ```
 
+## 启动本地工作台
+
+```bash
+git clone https://github.com/jiayibytq/atlas-ads-workbench.git
+cd atlas-ads-workbench
+python3 scripts/launch_workbench.py
+```
+
+启动器只绑定本机 `127.0.0.1`，并自动打开一个带一次性会话 token 的页面。不要直接用 `file://` 打开 `assets/workbench.html`，否则页面无法访问本地 API。
+
+可查看 [Phase 1 架构说明](docs/architecture/phase-1.md) 和 [示例输入](examples/intake.example.json)。
+
 ## License
 
 [MIT](LICENSE)

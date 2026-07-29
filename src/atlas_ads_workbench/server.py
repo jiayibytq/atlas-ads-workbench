@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlsplit
 
+from .feasibility import calculate_feasibility
 from .models import IntakeValidationError, validate_intake
 from .storage import LocalStorage, StorageError
 
@@ -119,13 +120,17 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
             self._error(500, "storage_error", str(error))
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != "/api/runs":
+        path = urlsplit(self.path).path
+        if path not in {"/api/runs", "/api/feasibility"}:
             self._error(404, "not_found", "The requested local resource does not exist.")
             return
         if not self._is_authorized():
             return
         try:
             intake = validate_intake(self._read_object())
+            if path == "/api/feasibility":
+                self._send_json(200, calculate_feasibility(intake))
+                return
             manifest = self.app_server.storage.create_run(
                 intake, self.app_server.workbench_version
             )

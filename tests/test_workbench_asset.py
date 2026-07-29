@@ -15,8 +15,11 @@ class WorkbenchAssetContractTests(unittest.TestCase):
             "市场",
             "产品阶段",
             "保存草稿",
+            "计算预算与可行性",
             "开始本次搭建",
             "本次运行快照",
+            "计算依据",
+            "可调整杠杆",
             "不会连接 Amazon",
             "不会上传数据",
         ):

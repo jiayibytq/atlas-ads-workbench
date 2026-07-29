@@ -104,6 +104,16 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(run["manifest"], manifest)
         self.assertEqual(run["intake"]["data_source"], "seller_input")
 
+    def test_authorized_client_can_calculate_transparent_feasibility(self):
+        status, result = self.request(
+            "/api/feasibility", "POST", valid_payload(), token="test-token"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(result["data_source"], "seller_input")
+        self.assertFalse(result["external_data_used"])
+        self.assertIn("required_cvr_percent", result["formulae"])
+
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(
             self.base_url + "/api/draft",

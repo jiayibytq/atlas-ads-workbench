@@ -103,7 +103,8 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(run["manifest"], manifest)
         self.assertEqual(run["intake"]["data_source"], "seller_input")
-        self.assertFalse(run["decision_plan"]["is_feasible_at_benchmark"])
+        self.assertFalse(run["decision_plan"]["feasibility"]["is_feasible_at_benchmark"])
+        self.assertEqual(len(run["decision_plan"]["campaign_architecture"]["campaigns"]), 4)
         self.assertEqual(len(manifest["decision_plan_sha256"]), 64)
 
     def test_authorized_client_can_calculate_transparent_feasibility(self):
@@ -115,6 +116,15 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(result["data_source"], "seller_input")
         self.assertFalse(result["external_data_used"])
         self.assertIn("required_cvr_percent", result["formulae"])
+
+    def test_authorized_client_can_preview_a_campaign_architecture(self):
+        status, architecture = self.request(
+            "/api/campaign-architecture", "POST", valid_payload(), token="test-token"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(architecture["status"], "review_required")
+        self.assertEqual(len(architecture["campaigns"]), 4)
 
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(

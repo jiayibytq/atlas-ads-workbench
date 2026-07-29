@@ -20,6 +20,9 @@ class WorkbenchAssetContractTests(unittest.TestCase):
             "本次运行快照",
             "计算依据",
             "可调整杠杆",
+            "预览广告架构",
+            "广告架构草案",
+            "需要人工复核",
             "不会连接 Amazon",
             "不会上传数据",
         ):

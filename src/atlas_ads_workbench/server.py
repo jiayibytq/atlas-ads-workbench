@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlsplit
 
+from .campaign_architecture import build_campaign_architecture
 from .feasibility import calculate_feasibility
 from .models import IntakeValidationError, validate_intake
 from .storage import LocalStorage, StorageError
@@ -121,7 +122,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in {"/api/runs", "/api/feasibility"}:
+        if path not in {"/api/runs", "/api/feasibility", "/api/campaign-architecture"}:
             self._error(404, "not_found", "The requested local resource does not exist.")
             return
         if not self._is_authorized():
@@ -131,10 +132,22 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/feasibility":
                 self._send_json(200, calculate_feasibility(intake))
                 return
+            feasibility = calculate_feasibility(intake)
+            if path == "/api/campaign-architecture":
+                self._send_json(200, build_campaign_architecture(intake, feasibility))
+                return
+            decision_plan = {
+                "decision_plan_version": 1,
+                "data_source": "seller_input_and_deterministic_rule",
+                "external_data_used": False,
+                "model_calls": 0,
+                "feasibility": feasibility,
+                "campaign_architecture": build_campaign_architecture(intake, feasibility),
+            }
             manifest = self.app_server.storage.create_run(
                 intake,
                 self.app_server.workbench_version,
-                calculate_feasibility(intake),
+                decision_plan,
             )
             self._send_json(201, manifest)
         except IntakeValidationError as error:

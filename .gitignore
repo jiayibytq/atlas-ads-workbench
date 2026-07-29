@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Local-only seller data and credentials
+.atlas-ads-workbench/
+.env
+.env.*
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/

@@ -65,6 +65,20 @@ class LocalStorageTests(unittest.TestCase):
         self.assertFalse(manifest["external_data_used"])
         self.assertEqual(manifest["model_calls"], 0)
 
+    def test_run_can_freeze_a_decision_plan_with_its_own_hash(self):
+        decision_plan = {
+            "calculation_version": 1,
+            "data_source": "seller_input",
+            "external_data_used": False,
+            "model_calls": 0,
+            "is_feasible_at_benchmark": False,
+        }
+        manifest = self.storage.create_run(self.intake, "0.2.0", decision_plan)
+
+        saved_run = self.storage.load_run(manifest["run_id"])
+        self.assertEqual(saved_run["decision_plan"], decision_plan)
+        self.assertEqual(len(manifest["decision_plan_sha256"]), 64)
+
     def test_corrupt_draft_has_an_actionable_error(self):
         draft_file = Path(self.temp_dir.name) / "drafts" / "current-intake.json"
         draft_file.parent.mkdir(parents=True)

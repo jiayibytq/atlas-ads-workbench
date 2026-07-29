@@ -103,6 +103,8 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertEqual(run["manifest"], manifest)
         self.assertEqual(run["intake"]["data_source"], "seller_input")
+        self.assertFalse(run["decision_plan"]["is_feasible_at_benchmark"])
+        self.assertEqual(len(manifest["decision_plan_sha256"]), 64)
 
     def test_authorized_client_can_calculate_transparent_feasibility(self):
         status, result = self.request(

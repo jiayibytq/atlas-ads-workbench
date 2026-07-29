@@ -132,7 +132,9 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(200, calculate_feasibility(intake))
                 return
             manifest = self.app_server.storage.create_run(
-                intake, self.app_server.workbench_version
+                intake,
+                self.app_server.workbench_version,
+                calculate_feasibility(intake),
             )
             self._send_json(201, manifest)
         except IntakeValidationError as error:

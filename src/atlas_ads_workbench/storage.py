@@ -59,7 +59,12 @@ class LocalStorage:
             return None
         return self._read_json(self.draft_path, "draft")
 
-    def create_run(self, intake: Mapping[str, Any], workbench_version: str) -> Dict[str, Any]:
+    def create_run(
+        self,
+        intake: Mapping[str, Any],
+        workbench_version: str,
+        decision_plan: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
         created_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         run_id = "%s-%s" % (
             datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S"),
@@ -81,10 +86,16 @@ class LocalStorage:
             "model_calls": 0,
             "phase_notice": "No Amazon, MCP, or model data was used in this run.",
         }
+        if decision_plan is not None:
+            manifest["decision_plan_sha256"] = hashlib.sha256(
+                self._canonical_json(decision_plan)
+            ).hexdigest()
 
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
             self._write_json_atomically(run_dir / "intake.json", intake)
+            if decision_plan is not None:
+                self._write_json_atomically(run_dir / "decision-plan.json", decision_plan)
             self._write_json_atomically(run_dir / "manifest.json", manifest)
         except (OSError, StorageError) as error:
             raise StorageError("could not create immutable run") from error
@@ -94,7 +105,11 @@ class LocalStorage:
         if not run_id or Path(run_id).name != run_id:
             raise StorageError("invalid run_id")
         run_dir = self.runs_dir / run_id
-        return {
+        result = {
             "intake": self._read_json(run_dir / "intake.json", "run intake"),
             "manifest": self._read_json(run_dir / "manifest.json", "run manifest"),
         }
+        decision_path = run_dir / "decision-plan.json"
+        if decision_path.exists():
+            result["decision_plan"] = self._read_json(decision_path, "decision plan")
+        return result

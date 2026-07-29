@@ -4,6 +4,7 @@ from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
 import json
+from pathlib import Path
 from typing import Any, Dict
 from urllib.parse import urlsplit
 
@@ -41,6 +42,19 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
     def _error(self, status: int, code: str, message: str) -> None:
         self._send_json(status, {"code": code, "message": message})
 
+    def _send_page(self) -> None:
+        try:
+            encoded = self.app_server.asset_path.read_bytes()
+        except OSError:
+            self._error(500, "asset_error", "The local workbench page is unavailable.")
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
+
     def _is_authorized(self) -> bool:
         token = self.headers.get("X-Atlas-Session")
         if token is None:
@@ -69,6 +83,9 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
+        if path == "/":
+            self._send_page()
+            return
         if path == "/health":
             self._send_json(200, {"ok": True, "version": self.app_server.workbench_version})
             return
@@ -132,4 +149,5 @@ def create_server(
     server.session_token = session_token
     server.storage = storage
     server.workbench_version = workbench_version
+    server.asset_path = Path(__file__).resolve().parents[2] / "assets" / "workbench.html"
     return server

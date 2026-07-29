@@ -67,6 +67,14 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body, {"ok": True, "version": "0.1.0"})
 
+    def test_root_returns_the_local_workbench_page(self):
+        with urlopen(self.base_url + "/") as response:
+            page = response.read().decode("utf-8")
+
+        self.assertEqual(response.status, 200)
+        self.assertIn("Atlas Ads", page)
+        self.assertIn("第一阶段：仅保存需求", page)
+
     def test_api_rejects_missing_and_wrong_tokens(self):
         with self.assertRaises(HTTPError) as missing:
             self.request("/api/draft")

@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from .campaign_architecture import build_campaign_architecture
 from .feasibility import calculate_feasibility
+from .gates import evaluate_gates
 from .models import IntakeValidationError, validate_intake
 from .storage import LocalStorage, StorageError
 
@@ -122,7 +123,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in {"/api/runs", "/api/feasibility", "/api/campaign-architecture"}:
+        if path not in {"/api/runs", "/api/feasibility", "/api/campaign-architecture", "/api/gates"}:
             self._error(404, "not_found", "The requested local resource does not exist.")
             return
         if not self._is_authorized():
@@ -133,6 +134,10 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(200, calculate_feasibility(intake))
                 return
             feasibility = calculate_feasibility(intake)
+            gates = evaluate_gates(intake, feasibility, {})
+            if path == "/api/gates":
+                self._send_json(200, gates)
+                return
             if path == "/api/campaign-architecture":
                 self._send_json(200, build_campaign_architecture(intake, feasibility))
                 return
@@ -142,6 +147,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 "external_data_used": False,
                 "model_calls": 0,
                 "feasibility": feasibility,
+                "gates": gates,
                 "campaign_architecture": build_campaign_architecture(intake, feasibility),
             }
             manifest = self.app_server.storage.create_run(

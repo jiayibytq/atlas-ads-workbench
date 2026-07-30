@@ -126,6 +126,15 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(architecture["status"], "review_required")
         self.assertEqual(len(architecture["campaigns"]), 4)
 
+    def test_authorized_client_can_evaluate_versioned_gates(self):
+        status, gates = self.request(
+            "/api/gates", "POST", valid_payload(), token="test-token"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(gates["SB-GATE-001"]["status"], "information_required")
+        self.assertIn("brand_registry_status", gates["SB-GATE-001"]["missing_fields"])
+
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(
             self.base_url + "/api/draft",

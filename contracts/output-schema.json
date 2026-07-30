@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Atlas Ads Decision Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "data_source", "generated_at", "decisions", "resource_use"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "data_source": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+    "resource_use": {"$ref": "#/$defs/resourceUse"}
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "status", "claim", "evidence", "rule", "assumptions", "next_action"],
+      "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["information_required", "ready_for_rule_evaluation", "review_required", "approved", "rejected"]},
+        "claim": {"type": "string"},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
+        "rule": {"$ref": "#/$defs/rule"},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "missing_fields": {"type": "array", "items": {"type": "string"}},
+        "conflicting_fields": {"type": "array", "items": {"type": "string"}},
+        "next_action": {"$ref": "#/$defs/nextAction"},
+        "human_review": {"type": "boolean"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "value", "status", "source", "captured_at"],
+      "properties": {
+        "field": {"type": "string"},
+        "value": {},
+        "status": {"enum": ["confirmed", "verified", "external_evidence"]},
+        "source": {"enum": ["seller_input", "amazon_ads_mcp", "seller_spreadsheet", "catalog_mcp", "inventory_mcp"]},
+        "captured_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {"id": {"type": "string"}, "version": {"type": "integer", "minimum": 1}}
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "label"],
+      "properties": {"type": {"type": "string"}, "label": {"type": "string"}}
+    },
+    "resourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["external_data_used", "model_calls"],
+      "properties": {"external_data_used": {"type": "boolean"}, "model_calls": {"type": "integer", "minimum": 0}}
+    }
+  }
+}

@@ -1,0 +1,85 @@
+# Atlas Ads Workbench decision contract. Version changes require review and tests.
+contract_version: 1
+purpose: >-
+  Declare what evidence is required before the workbench or a future agent may
+  express an advertising decision. A missing gate produces a gap and next action,
+  never an inferred recommendation.
+
+evidence_statuses:
+  confirmed: Seller states the value; it is not independently verified.
+  verified: An authorized external source has verified the value.
+  external_evidence: An authorized source supplied evidence that still needs human interpretation.
+
+allowed_external_sources:
+  - amazon_ads_mcp
+  - seller_spreadsheet
+  - catalog_mcp
+  - inventory_mcp
+
+gates:
+  - id: FEASIBILITY-GATE-001
+    version: 1
+    purpose: Calculate the visible total-budget feasibility boundary.
+    required_inputs:
+      - monthly_sales_target
+      - product_price_usd
+      - target_tacos_percent
+      - ad_sales_share_percent
+      - benchmark_cpc_usd
+      - benchmark_cvr_percent
+    output_boundary: >-
+      May calculate total budget and expose conflicts. Must not claim a market
+      benchmark or an executable campaign recommendation.
+
+  - id: SB-GATE-001
+    version: 1
+    purpose: Determine whether a Sponsored Brands rule may be evaluated.
+    required_evidence:
+      - field: advertiser_account_status
+        accepted_statuses: [verified]
+      - field: brand_registry_status
+        accepted_statuses: [verified]
+        accepted_values: [enrolled]
+      - field: campaign_goal
+        accepted_statuses: [confirmed]
+      - field: eligible_advertised_asins
+        accepted_statuses: [verified, external_evidence]
+    if_incomplete: Return missing evidence and collection action; do not recommend SB.
+
+  - id: SD-GATE-001
+    version: 1
+    purpose: Determine whether an SD and old-product cross-sell rule may be evaluated.
+    required_evidence:
+      - field: display_eligibility_status
+        accepted_statuses: [verified]
+      - field: campaign_goal
+        accepted_statuses: [confirmed]
+      - field: new_product_asin
+        accepted_statuses: [confirmed, verified, external_evidence]
+      - field: old_product_asins
+        accepted_statuses: [confirmed, verified, external_evidence]
+      - field: catalog_relationship
+        accepted_statuses: [confirmed]
+        accepted_values: [complementary, upgrade_path, compatible]
+      - field: inventory_health
+        accepted_statuses: [confirmed, verified, external_evidence]
+      - field: contribution_margin
+        accepted_statuses: [confirmed, external_evidence]
+    if_incomplete: Return missing evidence and collection action; do not recommend SD or old-product cross-sell.
+
+  - id: CAMPAIGN-ARCHITECTURE-GATE-001
+    version: 1
+    purpose: Permit a per-campaign budget draft only after targeting evidence exists.
+    required_evidence:
+      - field: keyword_targeting_evidence
+        accepted_statuses: [verified, external_evidence]
+      - field: product_targeting_evidence
+        accepted_statuses: [verified, external_evidence]
+    if_incomplete: >-
+      Show total budget feasibility and missing fields only. Do not show campaign
+      allocation percentages or daily campaign budgets.
+
+global_prohibitions:
+  - Do not turn seller-confirmed evidence into verified evidence.
+  - Do not cite an external source that was not captured in the run evidence context.
+  - Do not use an LLM as authority for arithmetic, provenance, eligibility, or Gate status.

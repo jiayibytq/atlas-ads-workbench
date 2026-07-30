@@ -135,6 +135,43 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(gates["SB-GATE-001"]["status"], "information_required")
         self.assertIn("brand_registry_status", gates["SB-GATE-001"]["missing_fields"])
 
+    def test_gates_accept_a_source_neutral_evidence_envelope(self):
+        status, gates = self.request(
+            "/api/gates",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "evidence_context": {
+                    "campaign_goal": {"value": "cross_sell", "status": "confirmed"}
+                }
+            },
+            token="test-token",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertIn("campaign_goal", gates["SB-GATE-001"]["passed_fields"])
+
+    def test_run_freezes_normalized_evidence_context_with_the_decision(self):
+        status, manifest = self.request(
+            "/api/runs",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "evidence_context": {
+                    "campaign_goal": {"value": "cross_sell", "status": "confirmed"}
+                },
+            },
+            token="test-token",
+        )
+        _, run = self.request("/api/runs/%s" % manifest["run_id"], token="test-token")
+
+        self.assertEqual(status, 201)
+        evidence = run["decision_plan"]["evidence_context"]["campaign_goal"]
+        self.assertEqual(evidence["value"], "cross_sell")
+        self.assertEqual(evidence["status"], "confirmed")
+        self.assertEqual(evidence["source"], "seller_input")
+        self.assertTrue(evidence["captured_at"])
+
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(
             self.base_url + "/api/draft",

@@ -1,6 +1,7 @@
 """A token-protected HTTP boundary for the localhost workbench."""
 
 from functools import partial
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import hmac
 import json
@@ -9,6 +10,7 @@ from typing import Any, Dict
 from urllib.parse import urlsplit
 
 from .campaign_architecture import build_campaign_architecture
+from .evidence import EvidenceValidationError, normalize_evidence_context
 from .feasibility import calculate_feasibility
 from .gates import evaluate_gates
 from .models import IntakeValidationError, validate_intake
@@ -84,6 +86,15 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
             raise IntakeValidationError("request body must be a JSON object")
         return payload
 
+    def _validated_intake_and_context(self):
+        payload = self._read_object()
+        if "intake" not in payload:
+            return validate_intake(payload), {}
+        raw_intake = payload.get("intake")
+        raw_context = payload.get("evidence_context", {})
+        captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        return validate_intake(raw_intake), normalize_evidence_context(raw_context, captured_at)
+
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
         if path == "/":
@@ -113,10 +124,10 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
         if not self._is_authorized():
             return
         try:
-            intake = validate_intake(self._read_object())
+            intake, _ = self._validated_intake_and_context()
             self.app_server.storage.save_draft(intake)
             self._send_json(200, intake)
-        except IntakeValidationError as error:
+        except (IntakeValidationError, EvidenceValidationError) as error:
             self._error(400, "bad_request", str(error))
         except StorageError as error:
             self._error(500, "storage_error", str(error))
@@ -129,12 +140,12 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
         if not self._is_authorized():
             return
         try:
-            intake = validate_intake(self._read_object())
+            intake, evidence_context = self._validated_intake_and_context()
             if path == "/api/feasibility":
                 self._send_json(200, calculate_feasibility(intake))
                 return
             feasibility = calculate_feasibility(intake)
-            gates = evaluate_gates(intake, feasibility, {})
+            gates = evaluate_gates(intake, feasibility, evidence_context)
             if path == "/api/gates":
                 self._send_json(200, gates)
                 return
@@ -146,6 +157,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 "data_source": "seller_input_and_deterministic_rule",
                 "external_data_used": False,
                 "model_calls": 0,
+                "evidence_context": evidence_context,
                 "feasibility": feasibility,
                 "gates": gates,
                 "campaign_architecture": build_campaign_architecture(intake, feasibility),
@@ -156,7 +168,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 decision_plan,
             )
             self._send_json(201, manifest)
-        except IntakeValidationError as error:
+        except (IntakeValidationError, EvidenceValidationError) as error:
             self._error(400, "bad_request", str(error))
         except StorageError as error:
             self._error(500, "storage_error", str(error))

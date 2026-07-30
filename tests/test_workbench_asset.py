@@ -24,6 +24,8 @@ class WorkbenchAssetContractTests(unittest.TestCase):
             "检查信息完整度",
             "SB-GATE-001",
             "SD-GATE-001",
+            "补充业务证据",
+            "品牌注册状态",
             "广告架构草案",
             "需要人工复核",
             "不会连接 Amazon",

@@ -19,9 +19,42 @@ CAMPAIGNS = (
 
 
 def build_campaign_architecture(
-    intake: Mapping[str, Any], feasibility: Mapping[str, Any]
+    intake: Mapping[str, Any], feasibility: Mapping[str, Any], evidence_context: Mapping[str, Any] = None
 ) -> Dict[str, Any]:
-    """Build a non-executing campaign budget draft from stage rules only."""
+    """Build a non-executing draft only after targeting evidence is present."""
+
+    evidence_context = evidence_context or {}
+    required_evidence = {
+        "keyword_targeting_evidence": {"verified", "external_evidence"},
+        "product_targeting_evidence": {"verified", "external_evidence"},
+    }
+    missing_fields = [
+        field
+        for field, accepted_statuses in required_evidence.items()
+        if not isinstance(evidence_context.get(field), Mapping)
+        or evidence_context[field].get("status") not in accepted_statuses
+        or evidence_context[field].get("value") in (None, "", [], {})
+    ]
+    if missing_fields:
+        return {
+            "architecture_version": 1,
+            "data_source": "deterministic_rule",
+            "external_data_used": False,
+            "model_calls": 0,
+            "status": "information_required",
+            "review_reason": (
+                "Total budget feasibility is available, but per-campaign budgets need "
+                "keyword and product-targeting evidence from an authorized data source."
+            ),
+            "missing_fields": missing_fields,
+            "next_action": {
+                "type": "collect_external_evidence",
+                "label": "Connect an authorized MCP or import a seller spreadsheet before generating campaign budgets.",
+            },
+            "stage_rule": intake["product_stage"],
+            "daily_budget_usd": float(feasibility["daily_ad_spend_cap_usd"]),
+            "campaigns": [],
+        }
 
     stage = intake["product_stage"]
     shares = STAGE_SHARES[stage]

@@ -104,7 +104,10 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(run["manifest"], manifest)
         self.assertEqual(run["intake"]["data_source"], "seller_input")
         self.assertFalse(run["decision_plan"]["feasibility"]["is_feasible_at_benchmark"])
-        self.assertEqual(len(run["decision_plan"]["campaign_architecture"]["campaigns"]), 4)
+        self.assertEqual(
+            run["decision_plan"]["campaign_architecture"]["status"],
+            "information_required",
+        )
         self.assertEqual(len(manifest["decision_plan_sha256"]), 64)
 
     def test_authorized_client_can_calculate_transparent_feasibility(self):
@@ -120,6 +123,33 @@ class LocalServerTests(unittest.TestCase):
     def test_authorized_client_can_preview_a_campaign_architecture(self):
         status, architecture = self.request(
             "/api/campaign-architecture", "POST", valid_payload(), token="test-token"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(architecture["status"], "information_required")
+        self.assertEqual(architecture["campaigns"], [])
+        self.assertIn("keyword_targeting_evidence", architecture["missing_fields"])
+
+    def test_campaign_architecture_needs_external_targeting_evidence(self):
+        status, architecture = self.request(
+            "/api/campaign-architecture",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "evidence_context": {
+                    "keyword_targeting_evidence": {
+                        "value": ["keyword snapshot"],
+                        "status": "external_evidence",
+                        "source": "seller_spreadsheet",
+                    },
+                    "product_targeting_evidence": {
+                        "value": ["ASIN snapshot"],
+                        "status": "external_evidence",
+                        "source": "seller_spreadsheet",
+                    },
+                },
+            },
+            token="test-token",
         )
 
         self.assertEqual(status, 200)

@@ -145,12 +145,15 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(200, calculate_feasibility(intake))
                 return
             feasibility = calculate_feasibility(intake)
+            architecture = build_campaign_architecture(
+                intake, feasibility, evidence_context
+            )
+            if path == "/api/campaign-architecture":
+                self._send_json(200, architecture)
+                return
             gates = evaluate_gates(intake, feasibility, evidence_context)
             if path == "/api/gates":
                 self._send_json(200, gates)
-                return
-            if path == "/api/campaign-architecture":
-                self._send_json(200, build_campaign_architecture(intake, feasibility))
                 return
             decision_plan = {
                 "decision_plan_version": 1,
@@ -160,7 +163,7 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 "evidence_context": evidence_context,
                 "feasibility": feasibility,
                 "gates": gates,
-                "campaign_architecture": build_campaign_architecture(intake, feasibility),
+                "campaign_architecture": architecture,
             }
             manifest = self.app_server.storage.create_run(
                 intake,

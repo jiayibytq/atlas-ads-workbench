@@ -23,10 +23,26 @@ def make_intake(**overrides):
 
 
 class CampaignArchitectureTests(unittest.TestCase):
-    def test_launch_allocation_is_a_fully_explained_budget_draft(self):
+    def test_launch_allocation_is_blocked_without_targeting_evidence(self):
         current_intake = make_intake()
         architecture = build_campaign_architecture(
             current_intake, calculate_feasibility(current_intake)
+        )
+
+        self.assertEqual(architecture["status"], "information_required")
+        self.assertEqual(architecture["campaigns"], [])
+        self.assertIn("keyword_targeting_evidence", architecture["missing_fields"])
+        self.assertIn("product_targeting_evidence", architecture["missing_fields"])
+
+    def test_launch_allocation_is_a_fully_explained_budget_draft_with_evidence(self):
+        current_intake = make_intake()
+        architecture = build_campaign_architecture(
+            current_intake,
+            calculate_feasibility(current_intake),
+            {
+                "keyword_targeting_evidence": {"value": ["keyword snapshot"], "status": "external_evidence"},
+                "product_targeting_evidence": {"value": ["ASIN snapshot"], "status": "external_evidence"},
+            },
         )
 
         self.assertEqual(architecture["status"], "review_required")
@@ -39,7 +55,12 @@ class CampaignArchitectureTests(unittest.TestCase):
     def test_feasible_allocation_is_ready_for_human_review(self):
         current_intake = make_intake(benchmark_cpc_usd=0.5, benchmark_cvr_percent=20)
         architecture = build_campaign_architecture(
-            current_intake, calculate_feasibility(current_intake)
+            current_intake,
+            calculate_feasibility(current_intake),
+            {
+                "keyword_targeting_evidence": {"value": ["keyword snapshot"], "status": "external_evidence"},
+                "product_targeting_evidence": {"value": ["ASIN snapshot"], "status": "external_evidence"},
+            },
         )
 
         self.assertEqual(architecture["status"], "ready_for_human_review")

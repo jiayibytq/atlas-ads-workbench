@@ -18,7 +18,7 @@
       "required": ["decision_id", "status", "claim", "evidence", "rule", "assumptions", "next_action"],
       "properties": {
         "decision_id": {"type": "string", "minLength": 1},
-        "status": {"enum": ["information_required", "ready_for_rule_evaluation", "review_required", "approved", "rejected"]},
+        "status": {"enum": ["not_applicable", "information_required", "verification_required", "constraint_conflict", "ready_for_rule_evaluation", "review_required", "approved", "rejected"]},
         "claim": {"type": "string"},
         "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
         "rule": {"$ref": "#/$defs/rule"},

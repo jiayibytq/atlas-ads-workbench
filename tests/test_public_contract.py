@@ -39,6 +39,21 @@ class PublicContractTests(unittest.TestCase):
             ["decision_id", "status", "claim", "evidence", "rule", "assumptions", "next_action"],
         )
 
+    def test_decision_contract_v2_names_progressive_workflow_statuses(self):
+        rules = (ROOT / "contracts" / "decision-rules.yaml").read_text("utf-8")
+        schema = json.loads((ROOT / "contracts" / "output-schema.json").read_text("utf-8"))
+
+        self.assertIn("contract_version: 2", rules)
+        self.assertIn("selected_ad_modules", rules)
+        self.assertIn("not_applicable", rules)
+        statuses = schema["$defs"]["decision"]["properties"]["status"]["enum"]
+        for status in (
+            "not_applicable",
+            "verification_required",
+            "constraint_conflict",
+        ):
+            self.assertIn(status, statuses)
+
     def test_decision_contract_document_explains_that_rules_are_not_data_connections(self):
         document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text("utf-8")
 

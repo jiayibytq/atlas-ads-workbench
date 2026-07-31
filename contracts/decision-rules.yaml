@@ -1,5 +1,5 @@
 # Atlas Ads Workbench decision contract. Version changes require review and tests.
-contract_version: 1
+contract_version: 2
 purpose: >-
   Declare what evidence is required before the workbench or a future agent may
   express an advertising decision. A missing gate produces a gap and next action,
@@ -15,6 +15,12 @@ allowed_external_sources:
   - seller_spreadsheet
   - catalog_mcp
   - inventory_mcp
+
+workflow_selection:
+  field: selected_ad_modules
+  allowed_values: [sp, sb, sd, sd_cross_sell]
+  empty_meaning: budget_only
+  unselected_gate_status: not_applicable
 
 gates:
   - id: FEASIBILITY-GATE-001
@@ -32,7 +38,9 @@ gates:
       benchmark or an executable campaign recommendation.
 
   - id: SB-GATE-001
-    version: 1
+    version: 2
+    applies_when:
+      selected_ad_modules_contains_any: [sb]
     purpose: Determine whether a Sponsored Brands rule may be evaluated.
     required_evidence:
       - field: advertiser_account_status
@@ -47,7 +55,9 @@ gates:
     if_incomplete: Return missing evidence and collection action; do not recommend SB.
 
   - id: SD-GATE-001
-    version: 1
+    version: 2
+    applies_when:
+      selected_ad_modules_contains_any: [sd, sd_cross_sell]
     purpose: Determine whether an SD and old-product cross-sell rule may be evaluated.
     required_evidence:
       - field: display_eligibility_status

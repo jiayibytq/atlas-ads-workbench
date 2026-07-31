@@ -45,6 +45,13 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("为什么固定演示预算不是真实建议", skill)
         self.assertIn("缺少授权账户数据", skill)
 
+    def test_skill_does_not_overclaim_current_external_evidence_capability(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("当前版本只记录卖家已填写的 `confirmed` 资料", skill)
+        self.assertIn("等待外部验证", skill)
+        self.assertIn("未来接入授权适配器后", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

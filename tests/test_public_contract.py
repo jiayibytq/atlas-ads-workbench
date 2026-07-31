@@ -102,6 +102,16 @@ class PublicContractTests(unittest.TestCase):
         self.assertIn("未选择的广告类型不执行 Gate", decision_contract)
         self.assertIn("卖家已填写不等于外部已验证", decision_contract)
 
+    def test_decision_contract_scopes_campaign_prohibitions_to_strategy_advice(self):
+        document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text(
+            "utf-8"
+        )
+
+        self.assertIn("真实或策略 Campaign 建议", document)
+        self.assertIn("固定演示分配", document)
+        self.assertIn("仅用于证明 UI 流程", document)
+        self.assertIn("不是市场证据，也不可直接执行", document)
+
 
 if __name__ == "__main__":
     unittest.main()

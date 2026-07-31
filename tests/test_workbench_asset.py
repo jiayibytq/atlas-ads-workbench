@@ -132,6 +132,7 @@ class WorkbenchAssetContractTests(unittest.TestCase):
         self.assertIn('id="review-evidence"', evidence_form)
         self.assertIn('type="submit"', evidence_form)
         self.assertIn("evidenceForm.addEventListener('submit'", page)
+        self.assertIn("function requireValidEvidence()", page)
         self.assertIn("if(!evidenceForm.reportValidity())", page)
         self.assertIn(
             "workflowState.selectedModules.has(section.dataset.moduleEvidence)", page
@@ -183,8 +184,6 @@ class WorkbenchAssetContractTests(unittest.TestCase):
 
         self.assert_appears_in_order(
             review_handler,
-            "evidenceForm.reportValidity()",
-            "evidenceContext();",
             "await checkGates();",
             "revealStep('review-plan');",
         )
@@ -195,6 +194,31 @@ class WorkbenchAssetContractTests(unittest.TestCase):
             "api('/api/demo-report'",
         ):
             self.assertIn(endpoint, page)
+
+    def test_post_review_edits_are_revalidated_before_every_evidence_consuming_request(self):
+        page = ASSET.read_text(encoding="utf-8")
+        validator = page[page.index("function requireValidEvidence()"):page.index(
+            "function renderTechnicalGates"
+        )]
+        request_blocks = (
+            page[page.index("async function checkGates()"):page.index(
+                "evidenceForm.addEventListener('submit'"
+            )],
+            page[page.index("async function previewArchitecture()"):page.index(
+                "document.querySelector('#architecture-button')"
+            )],
+            page[page.index("document.querySelector('#generate-report')"):page.index(
+                "if(token){"
+            )],
+        )
+
+        self.assert_appears_in_order(
+            validator,
+            "if(!workflowState.selectedModules.size) return;",
+            "if(!evidenceForm.reportValidity())",
+        )
+        for block in request_blocks:
+            self.assert_appears_in_order(block, "requireValidEvidence();", "api('")
 
     def test_feasibility_updates_persistent_sidebar_for_both_outcomes(self):
         page = ASSET.read_text(encoding="utf-8")

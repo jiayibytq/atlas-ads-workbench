@@ -516,6 +516,13 @@
       tell('已进入总预算审核；未要求无关广告资料。');
     });
 
+    function requireValidEvidence(){
+      if(!workflowState.selectedModules.size) return;
+      if(!evidenceForm.reportValidity()){
+        throw new Error('请先修正所选广告资料中的数值或格式。');
+      }
+    }
+
     function renderTechnicalGates(gates){
       document.querySelector('#technical-gate-details').innerHTML = Object.values(gates).map(gate => `
         <article class="metric">
@@ -526,6 +533,7 @@
     }
 
     async function checkGates(){
+      requireValidEvidence();
       if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
       const gates = await api('/api/gates',{method:'POST',body:JSON.stringify(gatePayload())});
       renderTechnicalGates(gates);
@@ -534,13 +542,8 @@
 
     evidenceForm.addEventListener('submit', async event => {
       event.preventDefault();
-      if(!evidenceForm.reportValidity()){
-        tell('请先修正所选广告资料中的数值或格式。', true);
-        return;
-      }
       try {
         tell('正在检查所选广告资料…');
-        evidenceContext();
         await checkGates();
         document.querySelector('#selected-gate-summary').innerHTML = `<p class="evidence-note">已记录 ${workflowState.selectedModules.size} 种广告目标。请展开规则与证据详情复核缺口；演示报告仍不可直接执行。</p>`;
         revealStep('review-plan');
@@ -555,6 +558,7 @@
     );
 
     async function previewArchitecture(){
+      requireValidEvidence();
       if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
       const result = await api('/api/campaign-architecture',{method:'POST',body:JSON.stringify(gatePayload())});
       const blocked = result.status === 'information_required';
@@ -609,6 +613,7 @@
 
     document.querySelector('#generate-report').addEventListener('click', async () => {
       try {
+        requireValidEvidence();
         if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
         tell('正在生成演示报告…');
         const response = await api('/api/demo-report',{

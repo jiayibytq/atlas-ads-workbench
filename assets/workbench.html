@@ -17,6 +17,23 @@
     form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px } label { display:grid; gap:6px; font-weight:650; color:#244536; font-size:13px } .full { grid-column:1/-1 } input,select,textarea { width:100%; border:1px solid #b8cfc0; border-radius:8px; background:#fff; color:var(--ink); font:inherit; padding:10px 11px } textarea { resize:vertical; min-height:76px } input:focus,select:focus,textarea:focus { outline:3px solid #cde6d8; border-color:var(--green) } .hint { color:#71877c; font-size:12px; font-weight:400 }
     .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:23px; grid-column:1/-1 } button { appearance:none; cursor:pointer; border-radius:8px; padding:11px 15px; font:inherit; font-weight:700; border:1px solid var(--green); transition:transform .12s ease } button:active { transform:translateY(1px) } .primary { color:#fff; background:var(--green) } .secondary { color:var(--forest); background:#fff } #message { min-height:22px; margin:16px 0 0; color:#315b48; font-size:13px } #message.error { color:#a5382c }
     .sidebar { display:grid; gap:18px } .status { padding:20px; border-radius:14px; background:var(--ink); color:#e8f4ed } .status h2 { color:#fff; font-size:18px } .status p { color:#b7d2c0; font-size:14px; margin:8px 0 0 } .step { border-top:1px solid #dce9e0; padding:14px 0 } .step:first-of-type { border-top:0 } .step b { display:block; font-size:13px } .step span { font-size:13px; color:#647d70 }.snapshot,.decision { display:none; background:#fff; border:1px solid var(--line); border-radius:14px; padding:20px }.snapshot.visible,.decision.visible{display:block}.snapshot code { display:block; margin-top:10px; white-space:pre-wrap; word-break:break-word; color:#365848; font-size:12px; background:#f2f7f3; padding:10px; border-radius:7px }.metric{border-top:1px solid #dce9e0;padding:10px 0}.metric b{display:block;font-size:19px;letter-spacing:-.03em}.metric span{color:#647d70;font-size:12px}.alert{margin-top:12px;padding:10px;border-radius:8px;background:#fff4df;color:#71490d;font-size:13px}.lever{margin-top:8px;color:#365848;font-size:13px}
+    .report { display:none; margin-top:26px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:24px; }
+    .report.visible { display:block; }
+    .report-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:18px; }
+    .report-total { color:var(--forest); font-size:28px; font-weight:760; letter-spacing:-.04em; white-space:nowrap; }
+    .report-meta { color:#587064; font-size:13px; }
+    .report-table-wrap { overflow-x:auto; border:1px solid #dce9e0; border-radius:10px; }
+    .report table { width:100%; border-collapse:collapse; min-width:760px; }
+    .report th,.report td { padding:12px 13px; border-bottom:1px solid #e2ece5; text-align:left; vertical-align:top; }
+    .report th { color:#527063; background:#f2f7f3; font-size:12px; letter-spacing:.02em; }
+    .report td { color:#203e31; font-size:13px; }
+    .report tbody tr:last-child td { border-bottom:0; }
+    .demo-pill { display:inline-block; margin-left:6px; padding:2px 6px; border-radius:999px; background:#fff0d5; color:#82530c; font-size:11px; }
+    .report-summary { margin-top:18px; padding:16px; border-left:3px solid var(--green); background:var(--mint); }
+    .report-summary h3 { margin:0 0 6px; font-size:15px; }
+    .report-summary p { margin:0; color:#315b48; }
+    .report-warning { margin-top:10px; color:#71490d; }
+    .advanced { grid-column:1/-1; margin-top:4px; }
     @media (max-width:760px){ main{padding:34px 16px 48px} header{padding:15px 16px}.layout{grid-template-columns:1fr}form{grid-template-columns:1fr}.full{grid-column:auto} }
   </style>
 </head>
@@ -24,7 +41,7 @@
   <header><div class="brand">Atlas Ads <span style="font-weight:400;color:#a9c9b7">广告决策台</span></div><span class="tag">本地工作台 · Phase 1</span></header>
   <main>
     <div class="eyebrow">LOCAL-FIRST AD BUILDING</div><h1>先固定输入，<br>再让决策可追溯。</h1><p class="intro">为广告搭建保留清晰的输入、来源和运行快照。你随时能看见本次方案从哪里开始。</p>
-    <section class="phase"><strong>第一阶段：仅保存需求，尚未连接数据源或生成投放方案。</strong>不会连接 Amazon，不会上传数据，也不会调用 MCP 或模型。</section>
+    <section class="phase"><strong>演示闭环：从卖家输入生成页面广告搭建报告。</strong>使用固定演示关键词与分配规则；不会连接 Amazon，不会上传数据，也不会调用 MCP 或模型，报告不可直接执行。</section>
     <div class="layout"><section class="panel"><h2>本次搭建资料</h2><p class="sub">带 * 的字段为必填项。所有金额以 USD 表示。</p>
       <form id="intake-form">
         <label>市场 *<select name="marketplace"><option value="US">美国（US）</option><option value="DE">德国（DE）</option><option value="UK">英国（UK）</option><option value="JP">日本（JP）</option></select></label>
@@ -37,9 +54,53 @@
         <label>类目 CVR（%）*<input name="benchmark_cvr_percent" type="number" min="0.01" max="100" value="10"></label>
         <label class="full">本次业务目标 *<textarea name="business_goals">验证核心关键词后再放大投入。</textarea><span class="hint">这是一条卖家假设，不会被当作外部事实。</span></label>
         <details class="full"><summary>补充业务证据（可选）</summary><p class="hint">以下均标记为卖家确认；账户资格仍需后续 MCP 或账户验证。</p><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:12px"><label>品牌注册状态<select name="brand_registry_status"><option value="">未知</option><option value="enrolled">已注册</option></select></label><label>广告目标<select name="campaign_goal"><option value="">未确认</option><option value="brand_defense">品牌防守</option><option value="cross_sell">老品导流</option><option value="new_product_launch">新品启动</option></select></label><label>新品 ASIN<input name="new_product_asin" placeholder="例如 B0..."></label><label>老品 ASIN（逗号分隔）<input name="old_product_asins" placeholder="例如 B0..., B0..."></label><label>新老品关系<select name="catalog_relationship"><option value="">未知</option><option value="complementary">互补</option><option value="upgrade_path">升级路径</option><option value="compatible">兼容</option><option value="substitute">替代</option></select></label><label>库存健康度<select name="inventory_health"><option value="">未知</option><option value="healthy">健康</option><option value="at_risk">有风险</option></select></label><label>单品贡献毛利（%）<input name="contribution_margin" type="number" min="0" max="100" step="0.01"></label></div></details>
-        <div class="actions"><button class="secondary" type="button" id="save">保存草稿</button><button class="secondary" type="button" id="calculate">计算预算与可行性</button><button class="secondary" type="button" id="gates-button">检查信息完整度</button><button class="secondary" type="button" id="architecture-button">预览广告架构</button><button class="primary" type="submit">开始本次搭建</button></div>
+        <div class="actions">
+          <button class="secondary" type="button" id="save">保存草稿</button>
+          <button class="primary" type="submit">生成演示报告</button>
+        </div>
+        <details class="advanced">
+          <summary>查看计算详情</summary>
+          <div class="actions">
+            <button class="secondary" type="button" id="calculate">计算预算与可行性</button>
+            <button class="secondary" type="button" id="gates-button">检查信息完整度</button>
+            <button class="secondary" type="button" id="architecture-button">预览广告架构</button>
+          </div>
+        </details>
       </form><p id="message" role="status"></p>
     </section><aside class="sidebar"><section class="status"><h2>本次方案用了什么</h2><p>数据来源：卖家填写<br>外部数据：未使用<br>模型调用：0 次<br>状态：等待保存输入</p></section><section class="panel"><div class="step"><b>01 · 输入资料</b><span>明确每个约束与假设。</span></div><div class="step"><b>02 · 信息完整度</b><span>先确认 Gate 是否通过。</span></div><div class="step"><b>03 · 计算依据</b><span>可复算公式与卖家假设。</span></div><div class="step"><b>04 · 运行快照</b><span>提交后冻结，供后续阶段使用。</span></div></section><section class="decision" id="gates"><h2>信息完整度</h2><p class="sub">检查 FEASIBILITY-GATE-001、SB-GATE-001、SD-GATE-001。Gate 未通过时，只显示缺口，不生成策略结论。</p><div id="gates-data"></div></section><section class="decision" id="decision"><h2>预算与可行性</h2><p class="sub">以下为公式推导，不是外部基准或投放建议。</p><div id="decision-data"></div></section><section class="decision" id="architecture"><h2>广告架构草案</h2><p class="sub">只有关键词与商品定向证据到位后才展示各 Campaign 预算；不执行投放，仍需人工确认。</p><div id="architecture-data"></div></section><section class="snapshot" id="snapshot"><h2>本次运行快照</h2><p class="sub" id="run-note"></p><code id="run-data"></code></section></aside></div>
+    <section class="report" id="demo-report" aria-live="polite">
+      <div class="report-head">
+        <div>
+          <div class="eyebrow">FIXED DEMO DATA · NOT EXECUTABLE</div>
+          <h2>演示广告搭建报告</h2>
+          <p class="report-meta" id="demo-meta"></p>
+        </div>
+        <div>
+          <div class="hint">总日预算</div>
+          <div class="report-total" id="demo-total"></div>
+        </div>
+      </div>
+      <div class="report-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>广告类型</th>
+              <th>广告目的</th>
+              <th>预算占比</th>
+              <th>日预算</th>
+              <th>具体投放词 / ASIN</th>
+              <th>投放类型</th>
+            </tr>
+          </thead>
+          <tbody id="demo-report-body"></tbody>
+        </table>
+      </div>
+      <div class="report-summary">
+        <h3>确定性说明</h3>
+        <p id="demo-summary"></p>
+        <div id="demo-warnings"></div>
+      </div>
+    </section>
   </main>
   <script>
     const token = new URLSearchParams(location.hash.slice(1)).get('token');
@@ -58,7 +119,48 @@
     document.querySelector('#gates-button').addEventListener('click',()=>checkGates().catch(e=>tell(e.message,true)));
     async function previewArchitecture(){ if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。'); const result=await api('/api/campaign-architecture',{method:'POST',body:JSON.stringify(gatePayload())}); const blocked=result.status==='information_required'; const status=blocked?'暂不生成预算':result.status==='review_required'?'需要人工复核':'可供人工复核'; const missing=blocked?'<div class="lever">待补充：'+result.missing_fields.join('、')+'<br>'+result.next_action.label+'</div>':''; document.querySelector('#architecture-data').innerHTML='<div class="alert">'+status+'：'+result.review_reason+'</div>'+missing+(result.campaigns||[]).map(item=>'<div class="metric"><span>'+item.name+' · '+percent(item.budget_share_percent)+'<br>'+item.basis+'</span><b>'+money(item.daily_budget_usd)+'</b></div>').join(''); document.querySelector('#architecture').classList.add('visible'); tell(blocked?'缺少外部定向证据，未生成 Campaign 预算。':'已显示广告架构草案；请先人工确认。'); }
     document.querySelector('#architecture-button').addEventListener('click',()=>previewArchitecture().catch(e=>tell(e.message,true)));
-    form.addEventListener('submit', async event => { event.preventDefault(); try { if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。'); const run=await api('/api/runs',{method:'POST',body:JSON.stringify(gatePayload())}); document.querySelector('#snapshot').classList.add('visible'); document.querySelector('#run-note').textContent='运行 '+run.run_id+' 已冻结；后续阶段将从此输入开始。'; document.querySelector('#run-data').textContent=JSON.stringify(run,null,2); tell('本次运行快照已创建。'); } catch(e) { tell(e.message,true); } });
+    function escapeHtml(value){
+      return String(value).replace(/[&<>"']/g, character => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      })[character]);
+    }
+    function renderDemoReport(report, manifest){
+      document.querySelector('#demo-meta').textContent =
+        '演示报告 · 卖家填写 + 固定演示数据 · 外部数据未使用 · 模型调用 0 次 · 不可直接执行 · 运行 ' + manifest.run_id;
+      document.querySelector('#demo-total').textContent = money(report.total_daily_budget_usd);
+      document.querySelector('#demo-report-body').innerHTML = report.rows.map(row =>
+        '<tr>' +
+          '<td>' + escapeHtml(row.ad_type) + '<span class="demo-pill">演示</span></td>' +
+          '<td>' + escapeHtml(row.purpose) + '</td>' +
+          '<td>' + percent(row.budget_share_percent) + '</td>' +
+          '<td>' + money(row.daily_budget_usd) + '</td>' +
+          '<td>' + escapeHtml(row.target) + '</td>' +
+          '<td>' + escapeHtml(row.target_type) + '</td>' +
+        '</tr>'
+      ).join('');
+      document.querySelector('#demo-summary').textContent = report.summary;
+      document.querySelector('#demo-warnings').innerHTML = report.warnings.map(
+        warning => '<div class="report-warning">' + escapeHtml(warning) + '</div>'
+      ).join('');
+      const section = document.querySelector('#demo-report');
+      section.classList.add('visible');
+      section.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      try {
+        if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
+        tell('正在生成演示报告…');
+        const response = await api('/api/demo-report', {
+          method:'POST',
+          body:JSON.stringify(gatePayload())
+        });
+        renderDemoReport(response.report, response.run);
+        tell('演示报告已生成并保存在本机；不可直接执行。');
+      } catch(error) {
+        tell(error.message, true);
+      }
+    });
     if(token) api('/api/draft').then(({draft})=>{ if(draft) Object.entries(draft).forEach(([key,value])=>{ const el=form.elements[key]; if(el) el.value=value; }); }).catch(()=>tell('无法读取已有草稿；你仍可填写并保存。',true));
   </script>
 </body></html>

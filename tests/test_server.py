@@ -73,7 +73,7 @@ class LocalServerTests(unittest.TestCase):
 
         self.assertEqual(response.status, 200)
         self.assertIn("Atlas Ads", page)
-        self.assertIn("第一阶段：仅保存需求", page)
+        self.assertIn("演示闭环", page)
 
     def test_api_rejects_missing_and_wrong_tokens(self):
         with self.assertRaises(HTTPError) as missing:

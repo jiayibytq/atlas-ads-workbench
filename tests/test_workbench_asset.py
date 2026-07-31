@@ -7,27 +7,25 @@ ASSET = ROOT / "assets" / "workbench.html"
 
 
 class WorkbenchAssetContractTests(unittest.TestCase):
-    def test_page_names_the_phase_one_boundary_and_core_actions(self):
+    def test_page_exposes_the_demo_report_happy_path(self):
         page = ASSET.read_text(encoding="utf-8")
 
         for expected_text in (
-            "第一阶段：仅保存需求",
-            "市场",
-            "产品阶段",
+            "生成演示报告",
+            "演示广告搭建报告",
+            "广告类型",
+            "广告目的",
+            "预算占比",
+            "日预算",
+            "具体投放词 / ASIN",
+            "投放类型",
+            "确定性说明",
+            "不可直接执行",
+            "/api/demo-report",
+            "renderDemoReport",
+            "scrollIntoView",
             "保存草稿",
-            "计算预算与可行性",
-            "开始本次搭建",
-            "本次运行快照",
-            "计算依据",
-            "可调整杠杆",
-            "预览广告架构",
-            "检查信息完整度",
-            "SB-GATE-001",
-            "SD-GATE-001",
-            "补充业务证据",
-            "品牌注册状态",
-            "广告架构草案",
-            "需要人工复核",
+            "查看计算详情",
             "不会连接 Amazon",
             "不会上传数据",
         ):

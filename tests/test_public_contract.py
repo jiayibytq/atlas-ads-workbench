@@ -50,6 +50,20 @@ class PublicContractTests(unittest.TestCase):
         ):
             self.assertIn(expected_text, document)
 
+    def test_public_docs_explain_the_demo_report_boundary(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        skill = (ROOT / "SKILL.md").read_text("utf-8")
+
+        for expected_text in (
+            "生成演示报告",
+            "30% / 45% / 25%",
+            "固定演示数据",
+            "不可直接执行",
+            "模型调用：0",
+        ):
+            self.assertIn(expected_text, readme)
+            self.assertIn(expected_text, skill)
+
 
 if __name__ == "__main__":
     unittest.main()

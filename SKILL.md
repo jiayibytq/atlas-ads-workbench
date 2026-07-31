@@ -7,7 +7,7 @@ description: Launch the local-first Atlas Ads Workbench when a seller wants to c
 
 ## Purpose
 
-Launch the local workbench for a seller to review inputs, calculate transparent total-budget feasibility, check evidence gates, and save immutable run snapshots. It does not execute advertising actions.
+Launch the local workbench for a seller to review inputs and generate a clearly labeled SP demo report. The report displays total-budget allocation, fixed demo targets, and a deterministic explanation, then freezes the result in a local run snapshot.
 
 ## Input
 
@@ -23,9 +23,11 @@ Accept partial information. Let the seller fill the remaining fields in the brow
 
 2. Keep the process running while the seller uses the local page. The launcher opens a `127.0.0.1` URL carrying a one-time session token in the URL fragment.
 3. Tell the seller that drafts and run snapshots stay in `~/.atlas-ads-workbench/` by default.
-4. Explain the visible boundaries: the workbench **不会连接 Amazon、不会上传数据**，and will not call MCP or a model.
-5. Point out the evidence Gate: seller-provided values are only `confirmed`; account eligibility or targeting data needs a later authorized source before it can be `verified` or `external_evidence`.
-6. Do not claim that a submitted run is an advertising strategy. It is a frozen, traceable decision record whose gaps remain visible.
+4. Tell the seller to complete the required inputs and click “生成演示报告”.
+5. Explain that total daily budget comes from seller inputs, while Campaign allocation uses the `30% / 45% / 25%` fixed demo rule.
+6. Identify the keywords and ASIN as 固定演示数据, not marketplace evidence.
+7. Explain the visible boundaries: 模型调用：0, no Amazon or MCP connection（不会连接 Amazon 或 MCP，且不会上传数据）, and the report is 不可直接执行.
+8. Treat the saved run as a traceable demo report, not an advertising strategy.
 
 ## Common Pitfalls
 
@@ -33,6 +35,7 @@ Accept partial information. Let the seller fill the remaining fields in the brow
 - Do not bind the server to a LAN address or expose the local URL publicly.
 - Do not put credentials, cookies, seller account identifiers, or real marketplace exports into the repository.
 - Do not present per-Campaign budgets before keyword and product-targeting evidence is captured from an authorized source.
+- Do not hide the fixed `30% / 45% / 25%` allocation rule or describe it as an Amazon best practice.
 
 ## References
 

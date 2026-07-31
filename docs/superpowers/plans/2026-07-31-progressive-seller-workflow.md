@@ -248,6 +248,7 @@ git commit -m "Define progressive workflow selection"
 ```python
 # Add to tests/test_gates.py
 def test_budget_only_path_does_not_mark_sb_or_sd_as_missing(self):
+    current_intake = intake()
     gates = evaluate_gates(
         current_intake,
         calculate_feasibility(current_intake),
@@ -260,6 +261,7 @@ def test_budget_only_path_does_not_mark_sb_or_sd_as_missing(self):
     self.assertFalse(gates["SB-GATE-001"]["applicable"])
 
 def test_only_selected_module_is_evaluated(self):
+    current_intake = intake()
     gates = evaluate_gates(
         current_intake,
         calculate_feasibility(current_intake),
@@ -271,6 +273,7 @@ def test_only_selected_module_is_evaluated(self):
     self.assertEqual(gates["SD-GATE-001"]["status"], "not_applicable")
 
 def test_feasibility_conflict_has_an_unambiguous_status(self):
+    current_intake = intake()
     gate = evaluate_gates(
         current_intake,
         calculate_feasibility(current_intake),

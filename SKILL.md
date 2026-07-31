@@ -1,6 +1,6 @@
 ---
 name: atlas-ads-workbench
-description: Launch the local-first Atlas Ads Workbench when a seller wants to capture Amazon advertising build inputs, save a local draft, or create a transparent run snapshot before strategy generation. Use for requests such as “打开 Atlas Ads 广告工作台”.
+description: Launch the local-first Atlas Ads Workbench when a seller asks to “生成 SP 演示报告” or “打开工作台” to review Amazon advertising build inputs and a transparent local snapshot.
 ---
 
 # Atlas Ads Workbench
@@ -34,7 +34,7 @@ Accept partial information. Let the seller fill the remaining fields in the brow
 - Do not open `assets/workbench.html` with `file://`; that bypasses the local API and has no session token.
 - Do not bind the server to a LAN address or expose the local URL publicly.
 - Do not put credentials, cookies, seller account identifiers, or real marketplace exports into the repository.
-- Do not present per-Campaign budgets before keyword and product-targeting evidence is captured from an authorized source.
+- 固定演示预算允许展示，但不得描述为真实或可执行；真实预算仍需授权证据。
 - Do not hide the fixed `30% / 45% / 25%` allocation rule or describe it as an Amazon best practice.
 
 ## References

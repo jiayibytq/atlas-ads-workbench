@@ -64,6 +64,16 @@ class PublicContractTests(unittest.TestCase):
             self.assertIn(expected_text, readme)
             self.assertIn(expected_text, skill)
 
+    def test_readme_describes_the_current_demo_budget_flow(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+
+        for expected_text in (
+            "当前演示闭环",
+            "确定性公式",
+            "30% / 45% / 25%",
+        ):
+            self.assertIn(expected_text, readme)
+
 
 if __name__ == "__main__":
     unittest.main()

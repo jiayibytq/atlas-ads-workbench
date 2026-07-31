@@ -1,9 +1,23 @@
 from pathlib import Path
+from html.parser import HTMLParser
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET = ROOT / "assets" / "workbench.html"
+
+
+class InputAttributeParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.inputs = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "input":
+            return
+        attributes = dict(attrs)
+        if name := attributes.get("name"):
+            self.inputs[name] = attributes
 
 
 class WorkbenchAssetContractTests(unittest.TestCase):
@@ -64,6 +78,12 @@ class WorkbenchAssetContractTests(unittest.TestCase):
         self.assertEqual(page.count('<th scope="col">'), 6)
         self.assertIn('id="demo-report" aria-live="polite" tabindex="-1"', page)
         self.assertIn("section.focus({preventScroll:true})", page)
+
+    def test_benchmark_cvr_accepts_decimal_percentage_values(self):
+        parser = InputAttributeParser()
+        parser.feed(ASSET.read_text(encoding="utf-8"))
+
+        self.assertEqual(parser.inputs["benchmark_cvr_percent"].get("step"), "0.01")
 
 
 if __name__ == "__main__":

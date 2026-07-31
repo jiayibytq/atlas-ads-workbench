@@ -1,4 +1,5 @@
 from pathlib import Path
+from decimal import Decimal
 import sys
 import unittest
 
@@ -34,6 +35,7 @@ class DemoReportTests(unittest.TestCase):
 
         self.assertEqual(report["report_version"], 1)
         self.assertEqual(report["report_type"], "demo")
+        self.assertEqual(report["feasibility_status"], "constraint_conflict")
         self.assertFalse(report["is_executable"])
         self.assertFalse(report["external_data_used"])
         self.assertEqual(report["model_calls"], 0)
@@ -57,11 +59,54 @@ class DemoReportTests(unittest.TestCase):
         feasibility = calculate_feasibility(make_intake())
         report = build_demo_report(feasibility)
 
-        allocated = round(
-            sum(row["daily_budget_usd"] for row in report["rows"]), 2
+        allocated = sum(
+            Decimal(str(row["daily_budget_usd"])) for row in report["rows"]
         )
-        self.assertEqual(allocated, report["total_daily_budget_usd"])
+        self.assertEqual(allocated, Decimal(str(report["total_daily_budget_usd"])))
         self.assertEqual(report["total_daily_budget_usd"], 49.49)
+
+    def test_half_cent_daily_budget_uses_decimal_half_up_rounding(self):
+        feasibility = calculate_feasibility(
+            make_intake(
+                monthly_sales_target=10,
+                product_price_usd=36.15,
+                target_tacos_percent=10,
+            )
+        )
+        report = build_demo_report(feasibility)
+
+        self.assertEqual(feasibility["daily_ad_spend_cap_usd"], 1.205)
+        self.assertEqual(report["total_daily_budget_usd"], 1.21)
+
+    def test_report_rebuilds_money_from_seller_basis_instead_of_rounding_a_float(self):
+        feasibility = calculate_feasibility(
+            make_intake(
+                monthly_sales_target=10,
+                product_price_usd=36.15,
+                target_tacos_percent=10,
+            )
+        )
+        feasibility["daily_ad_spend_cap_usd"] = 1.2049999999999998
+
+        report = build_demo_report(feasibility)
+
+        self.assertEqual(report["total_daily_budget_usd"], 1.21)
+
+    def test_very_small_budget_still_conserves_the_displayed_total(self):
+        feasibility = calculate_feasibility(
+            make_intake(
+                monthly_sales_target=1,
+                product_price_usd=0.01,
+                target_tacos_percent=0.01,
+            )
+        )
+        report = build_demo_report(feasibility)
+
+        allocated = sum(
+            Decimal(str(row["daily_budget_usd"])) for row in report["rows"]
+        )
+        self.assertEqual(report["total_daily_budget_usd"], 0.0)
+        self.assertEqual(allocated, Decimal("0.0"))
 
     def test_infeasible_inputs_add_a_warning_without_hiding_the_demo(self):
         feasibility = calculate_feasibility(make_intake())
@@ -69,6 +114,7 @@ class DemoReportTests(unittest.TestCase):
 
         self.assertEqual(len(report["warnings"]), 1)
         self.assertIn("输入假设存在可行性冲突", report["warnings"][0])
+        self.assertIn("当前输入假设存在可行性冲突", report["summary"])
         self.assertIn("固定演示规则", report["summary"])
         self.assertEqual(len(report["rows"]), 3)
 
@@ -78,6 +124,7 @@ class DemoReportTests(unittest.TestCase):
         )
         report = build_demo_report(feasibility)
 
+        self.assertEqual(report["feasibility_status"], "feasible_at_benchmark")
         self.assertEqual(report["warnings"], [])
 
 

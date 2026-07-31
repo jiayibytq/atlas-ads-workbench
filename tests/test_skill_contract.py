@@ -24,6 +24,27 @@ class SkillContractTests(unittest.TestCase):
         self.assertIn("不得描述为真实或可执行", skill)
         self.assertIn("真实预算仍需授权证据", skill)
 
+    def test_skill_has_required_coaching_structure_and_inviting_input(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("type: workflow", skill.split("---", 2)[1])
+        for heading in (
+            "## Purpose",
+            "## Input",
+            "## Key Concepts",
+            "## Application",
+            "## Examples",
+            "## Common Pitfalls",
+            "## References",
+        ):
+            self.assertIn(heading, skill)
+        self.assertIn("零输入", skill)
+        self.assertIn("部分输入", skill)
+        self.assertIn("inline", skill)
+        self.assertIn("示例调用", skill)
+        self.assertIn("为什么固定演示预算不是真实建议", skill)
+        self.assertIn("缺少授权账户数据", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,21 +1,26 @@
 """Deterministic, explainable Amazon Ads feasibility calculations."""
 
+from decimal import Decimal
 from typing import Any, Dict, Mapping
 
 
 def calculate_feasibility(intake: Mapping[str, Any]) -> Dict[str, Any]:
     """Calculate constraints from seller inputs without external data or models."""
 
-    price = float(intake["product_price_usd"])
-    monthly_sales = float(intake["monthly_sales_target"])
+    price_decimal = Decimal(str(intake["product_price_usd"]))
+    monthly_sales_decimal = Decimal(str(intake["monthly_sales_target"]))
+    tacos_decimal = Decimal(str(intake["target_tacos_percent"])) / Decimal("100")
+    monthly_revenue = monthly_sales_decimal * price_decimal
+    monthly_ad_spend = monthly_revenue * tacos_decimal
+    daily_ad_spend = monthly_ad_spend / Decimal("30")
+
+    price = float(price_decimal)
+    monthly_sales = float(monthly_sales_decimal)
     tacos = float(intake["target_tacos_percent"]) / 100
     ad_share = float(intake["ad_sales_share_percent"]) / 100
     cpc = float(intake["benchmark_cpc_usd"])
     cvr = float(intake["benchmark_cvr_percent"]) / 100
 
-    monthly_revenue = monthly_sales * price
-    monthly_ad_spend = monthly_revenue * tacos
-    daily_ad_spend = monthly_ad_spend / 30
     daily_ad_orders = monthly_sales * ad_share / 30
     ad_acos_cap = tacos / ad_share
     required_cvr = cpc / (price * ad_acos_cap)
@@ -94,9 +99,9 @@ def calculate_feasibility(intake: Mapping[str, Any]) -> Dict[str, Any]:
         "model_calls": 0,
         "basis": basis,
         "formulae": formulae,
-        "monthly_revenue_target_usd": monthly_revenue,
-        "monthly_ad_spend_cap_usd": monthly_ad_spend,
-        "daily_ad_spend_cap_usd": daily_ad_spend,
+        "monthly_revenue_target_usd": float(monthly_revenue),
+        "monthly_ad_spend_cap_usd": float(monthly_ad_spend),
+        "daily_ad_spend_cap_usd": float(daily_ad_spend),
         "daily_ad_orders_target": daily_ad_orders,
         "ad_acos_cap_percent": ad_acos_cap * 100,
         "required_cvr_percent": required_cvr * 100,

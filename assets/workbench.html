@@ -67,8 +67,8 @@
           </div>
         </details>
       </form><p id="message" role="status"></p>
-    </section><aside class="sidebar"><section class="status"><h2>本次方案用了什么</h2><p>数据来源：卖家填写<br>外部数据：未使用<br>模型调用：0 次<br>状态：等待保存输入</p></section><section class="panel"><div class="step"><b>01 · 输入资料</b><span>明确每个约束与假设。</span></div><div class="step"><b>02 · 信息完整度</b><span>先确认 Gate 是否通过。</span></div><div class="step"><b>03 · 计算依据</b><span>可复算公式与卖家假设。</span></div><div class="step"><b>04 · 运行快照</b><span>提交后冻结，供后续阶段使用。</span></div></section><section class="decision" id="gates"><h2>信息完整度</h2><p class="sub">检查 FEASIBILITY-GATE-001、SB-GATE-001、SD-GATE-001。Gate 未通过时，只显示缺口，不生成策略结论。</p><div id="gates-data"></div></section><section class="decision" id="decision"><h2>预算与可行性</h2><p class="sub">以下为公式推导，不是外部基准或投放建议。</p><div id="decision-data"></div></section><section class="decision" id="architecture"><h2>广告架构草案</h2><p class="sub">只有关键词与商品定向证据到位后才展示各 Campaign 预算；不执行投放，仍需人工确认。</p><div id="architecture-data"></div></section><section class="snapshot" id="snapshot"><h2>本次运行快照</h2><p class="sub" id="run-note"></p><code id="run-data"></code></section></aside></div>
-    <section class="report" id="demo-report" aria-live="polite">
+    </section><aside class="sidebar"><section class="status"><h2>本次方案用了什么</h2><p id="run-status">数据来源：卖家填写<br>外部数据：未使用<br>模型调用：0 次<br>状态：等待保存输入</p></section><section class="panel"><div class="step"><b>01 · 输入资料</b><span>明确每个约束与假设。</span></div><div class="step"><b>02 · 信息完整度</b><span>先确认 Gate 是否通过。</span></div><div class="step"><b>03 · 计算依据</b><span>可复算公式与卖家假设。</span></div><div class="step"><b>04 · 运行快照</b><span>提交后冻结，供后续阶段使用。</span></div></section><section class="decision" id="gates"><h2>信息完整度</h2><p class="sub">检查 FEASIBILITY-GATE-001、SB-GATE-001、SD-GATE-001。Gate 未通过时，只显示缺口，不生成策略结论。</p><div id="gates-data"></div></section><section class="decision" id="decision"><h2>预算与可行性</h2><p class="sub">以下为公式推导，不是外部基准或投放建议。</p><div id="decision-data"></div></section><section class="decision" id="architecture"><h2>广告架构草案</h2><p class="sub">只有关键词与商品定向证据到位后才展示各 Campaign 预算；不执行投放，仍需人工确认。</p><div id="architecture-data"></div></section><section class="snapshot" id="snapshot"><h2>本次运行快照</h2><p class="sub" id="run-note"></p><code id="run-data"></code></section></aside></div>
+    <section class="report" id="demo-report" aria-live="polite" tabindex="-1">
       <div class="report-head">
         <div>
           <div class="eyebrow">FIXED DEMO DATA · NOT EXECUTABLE</div>
@@ -80,16 +80,17 @@
           <div class="report-total" id="demo-total"></div>
         </div>
       </div>
-      <div class="report-table-wrap">
+      <div class="report-table-wrap" tabindex="0" aria-label="演示广告预算表，可横向滚动">
         <table>
+          <caption>演示广告预算分配</caption>
           <thead>
             <tr>
-              <th>广告类型</th>
-              <th>广告目的</th>
-              <th>预算占比</th>
-              <th>日预算</th>
-              <th>具体投放词 / ASIN</th>
-              <th>投放类型</th>
+              <th scope="col">广告类型</th>
+              <th scope="col">广告目的</th>
+              <th scope="col">预算占比</th>
+              <th scope="col">日预算</th>
+              <th scope="col">具体投放词 / ASIN</th>
+              <th scope="col">投放类型</th>
             </tr>
           </thead>
           <tbody id="demo-report-body"></tbody>
@@ -125,8 +126,21 @@
       })[character]);
     }
     function renderDemoReport(report, manifest){
+      const externalData = report.external_data_used ? '已使用' : '未使用';
+      const executionStatus = report.is_executable ? '可执行' : '不可直接执行';
       document.querySelector('#demo-meta').textContent =
-        '演示报告 · 卖家填写 + 固定演示数据 · 外部数据未使用 · 模型调用 0 次 · 不可直接执行 · 运行 ' + manifest.run_id;
+        '演示报告 · 预算依据：' + report.budget_basis +
+        ' · 分配规则：' + report.allocation_rule +
+        ' · 外部数据：' + externalData +
+        ' · 模型调用：' + report.model_calls + ' 次' +
+        ' · ' + executionStatus +
+        ' · 可行性：' + report.feasibility_status +
+        ' · 运行 ' + manifest.run_id;
+      document.querySelector('#run-status').textContent =
+        '数据来源：卖家填写 + 固定演示数据\n' +
+        '外部数据：' + externalData + '\n' +
+        '模型调用：' + report.model_calls + ' 次\n' +
+        '状态：已冻结演示报告 · ' + executionStatus;
       document.querySelector('#demo-total').textContent = money(report.total_daily_budget_usd);
       document.querySelector('#demo-report-body').innerHTML = report.rows.map(row =>
         '<tr>' +
@@ -144,6 +158,7 @@
       ).join('');
       const section = document.querySelector('#demo-report');
       section.classList.add('visible');
+      section.focus({preventScroll:true});
       section.scrollIntoView({behavior:'smooth', block:'start'});
     }
     form.addEventListener('submit', async event => {

@@ -62,6 +62,23 @@ class WorkbenchAssetContractTests(unittest.TestCase):
         self.assertNotIn("ready_for_rule_evaluation</b>", page)
         self.assertIn("查看规则与证据详情", page)
 
+    def test_page_separates_seller_readiness_from_technical_gate_details(self):
+        page = ASSET.read_text(encoding="utf-8")
+
+        for text in (
+            "存在数值冲突",
+            "待补充资料",
+            "等待外部验证",
+            "资料已齐全",
+            "未选择",
+            "technical-gate-details",
+            "seller_status",
+            "seller_message",
+        ):
+            self.assertIn(text, page)
+
+        self.assertIn("selected_ad_modules", page)
+
     def test_page_uses_a_session_fragment_without_persisting_the_token(self):
         page = ASSET.read_text(encoding="utf-8")
 

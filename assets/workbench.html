@@ -54,6 +54,10 @@
     .metric { border-top:1px solid #dce9e0; padding:12px 0 }
     .metric b { display:block; font-size:19px; letter-spacing:-.03em }
     .metric span { color:#647d70; font-size:12px }
+    .readiness-card { border-left:3px solid var(--green); margin-top:12px; padding:12px 14px; border-radius:8px; background:#f2f7f3 }
+    .readiness-card.readiness-constraint_conflict { border-color:#995a12; background:#fff4df }
+    .readiness-card strong { display:block; font-size:16px }
+    .readiness-card p { margin:4px 0 0; color:#365848; font-size:13px }
     .alert { margin-top:12px; padding:10px; border-radius:8px; background:#fff4df; color:#71490d; font-size:13px }
     .lever { margin-top:8px; color:#365848; font-size:13px }
     .sidebar { display:grid; gap:18px; position:sticky; top:18px }
@@ -215,6 +219,7 @@
           <div class="step-label">第 5 步 · 审核并生成</div>
           <h2>广告框架审核</h2>
           <div id="selected-gate-summary"></div>
+          <p class="evidence-note">演示报告可以生成，但存在冲突或待验证资料的模块不得描述为可执行广告建议。</p>
           <div class="actions">
             <button class="primary" type="button" id="generate-report">生成演示报告</button>
           </div>
@@ -362,7 +367,11 @@
       return context;
     }
 
-    const gatePayload = () => ({intake:payload(),evidence_context:evidenceContext()});
+    const gatePayload = () => ({
+      intake: payload(),
+      selected_ad_modules: [...workflowState.selectedModules],
+      evidence_context: evidenceContext()
+    });
 
     async function api(path, options = {}) {
       const response = await fetch(path, {
@@ -523,7 +532,33 @@
       }
     }
 
-    function renderTechnicalGates(gates){
+    function renderSellerGateSummary(gates){
+      const applicable = Object.values(gates).filter(gate => gate.applicable);
+      document.querySelector('#selected-gate-summary').innerHTML = applicable.map(gate => {
+        const sellerStatus = gate.seller_status || (
+          gate.gate_id === 'FEASIBILITY-GATE-001'
+            ? '目标可行'
+            : gate.status === 'constraint_conflict'
+              ? '存在数值冲突'
+              : gate.status === 'verification_required'
+                ? '等待外部验证'
+                : gate.status === 'information_required'
+                  ? '待补充资料'
+                  : gate.status === 'not_applicable'
+                    ? '未选择'
+                    : '资料已齐全'
+        );
+        const sellerMessage = gate.seller_message || '请根据资料状态完成下一步人工复核。';
+        return `
+          <article class="readiness-card readiness-${escapeHtml(gate.status)}">
+            <strong>${escapeHtml(sellerStatus)}</strong>
+            <p>${escapeHtml(sellerMessage)}</p>
+          </article>
+        `;
+      }).join('');
+    }
+
+    function renderTechnicalGateDetails(gates){
       document.querySelector('#technical-gate-details').innerHTML = Object.values(gates).map(gate => `
         <article class="metric">
           <span><b>${escapeHtml(gate.gate_id)} · v${gate.version}</b><br>internal status: ${escapeHtml(gate.status)}</span>
@@ -532,10 +567,15 @@
       `).join('');
     }
 
+    function renderTechnicalGates(gates){
+      renderTechnicalGateDetails(gates);
+    }
+
     async function checkGates(){
       requireValidEvidence();
       if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
       const gates = await api('/api/gates',{method:'POST',body:JSON.stringify(gatePayload())});
+      renderSellerGateSummary(gates);
       renderTechnicalGates(gates);
       return gates;
     }
@@ -545,7 +585,6 @@
       try {
         tell('正在检查所选广告资料…');
         await checkGates();
-        document.querySelector('#selected-gate-summary').innerHTML = `<p class="evidence-note">已记录 ${workflowState.selectedModules.size} 种广告目标。请展开规则与证据详情复核缺口；演示报告仍不可直接执行。</p>`;
         revealStep('review-plan');
         tell('资料已整理到审核步骤；系统没有把卖家确认当作外部验证。');
       } catch(error) {
@@ -616,6 +655,7 @@
         requireValidEvidence();
         if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
         tell('正在生成演示报告…');
+        await checkGates();
         const response = await api('/api/demo-report',{
           method:'POST',
           body:JSON.stringify(gatePayload())

@@ -21,11 +21,13 @@ Launch the local workbench for a seller to review inputs and generate a clearly 
 ## Key Concepts
 
 - **确定性预算边界：** 总日预算仅由卖家填写的月销量、售价和目标 TACoS 按公开公式计算；金额链使用十进制计算，最终才显示为美分。
-- **固定演示分配：** `30% / 45% / 25%` 只负责证明报告生成、分配和保存流程。固定关键词与 ASIN 同样不是市场证据。
-- **证据边界：** `external_data_used: false` 与 `model_calls: 0` 说明本次没有调用 Amazon、MCP、外部数据或模型。这提升可追溯性，但不会自动让结果成为建议。
-- **人类决策边界：** `is_executable: false` 表示报告只供审阅。真实广告搭建仍需授权账户数据、关键词/商品定向证据、库存与毛利判断以及人工批准。
+- **固定演示分配：** `30% / 45% / 25%` 只负责证明报告生成、分配和保存流程。固定关键词与 ASIN 是固定演示数据，不是市场证据。
+- **证据边界：** `external_data_used: false` 与 `model_calls: 0`（模型调用：0）说明本次不会连接 Amazon 或 MCP，也不会上传数据或使用外部数据。这提升可追溯性，但不会自动让结果成为建议。
+- **人类决策边界：** `is_executable: false` 表示报告不可直接执行，只供审阅。真实广告搭建仍需授权账户数据、关键词/商品定向证据、库存与毛利判断以及人工批准。
 
 ## Application
+
+工作台按照 `基础输入 → 预算与可行性 → 选择广告目标 → 补充证据 → 审核并生成` 引导卖家；每一步只要求当前决定所需的信息。
 
 1. From the repository root, run:
 
@@ -35,11 +37,12 @@ Launch the local workbench for a seller to review inputs and generate a clearly 
 
 2. Keep the process running while the seller uses the local page. The launcher opens a `127.0.0.1` URL carrying a one-time session token in the URL fragment.
 3. Tell the seller that drafts and run snapshots stay in `~/.atlas-ads-workbench/` by default.
-4. Tell the seller to complete the required inputs and click “生成演示报告”.
-5. Explain that total daily budget comes from seller inputs, while Campaign allocation uses the `30% / 45% / 25%` fixed demo rule.
-6. Identify the keywords and ASIN as 固定演示数据, not marketplace evidence.
-7. Explain the visible boundaries: 模型调用：0, no Amazon or MCP connection（不会连接 Amazon 或 MCP，且不会上传数据）, and the report is 不可直接执行.
-8. Treat the saved run as a traceable demo report, not an advertising strategy.
+4. 引导卖家先完成基础输入并点击“计算目标预算”。
+5. 解释目标预算、所需 CVR、卖家假设 CVR 和可调整杠杆。
+6. 让卖家选择需要搭建的广告类型；不要默认要求完成全部 SB/SD 资料。
+7. 只收集所选广告类型需要的卖家信息和外部证据。
+8. 明确区分“卖家已填写”“等待外部验证”“资料已验证”和“不适用”。
+9. 最终生成演示报告时，继续显示模型调用、外部数据使用、规则版本和不可执行边界。
 
 ## Examples
 

@@ -89,6 +89,19 @@ class PublicContractTests(unittest.TestCase):
         ):
             self.assertIn(expected_text, readme)
 
+    def test_public_docs_explain_the_progressive_seller_workflow(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        skill = (ROOT / "SKILL.md").read_text("utf-8")
+        decision_contract = (
+            ROOT / "docs" / "architecture" / "decision-contract.md"
+        ).read_text("utf-8")
+
+        workflow = "基础输入 → 预算与可行性 → 选择广告目标 → 补充证据 → 审核并生成"
+        self.assertIn(workflow, readme)
+        self.assertIn(workflow, skill)
+        self.assertIn("未选择的广告类型不执行 Gate", decision_contract)
+        self.assertIn("卖家已填写不等于外部已验证", decision_contract)
+
 
 if __name__ == "__main__":
     unittest.main()

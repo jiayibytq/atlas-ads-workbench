@@ -26,6 +26,7 @@
     h3 { margin:18px 0 8px; font-size:15px }
     .sub { color:#678076; margin:0 0 22px; font-size:14px }
     form,.field-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px }
+    #evidence-form { display:block }
     label { display:grid; gap:6px; font-weight:650; color:#244536; font-size:13px }
     .full { grid-column:1/-1 }
     input,select,textarea { width:100%; border:1px solid #b8cfc0; border-radius:8px; background:#fff; color:var(--ink); font:inherit; padding:10px 11px }
@@ -145,7 +146,8 @@
         <section class="panel workflow-step" id="module-selection" hidden>
           <div class="step-label">第 3 步 · 选择广告目标</div>
           <h2>你接下来希望搭建哪些广告？</h2>
-          <p class="sub">选择下一步广告目标；可以多选，也可以先只确认总预算。</p>
+          <p class="sub">选择下一步广告目标；可以先只确认总预算。</p>
+          <p class="evidence-note" id="advanced-module-rule">SB、SD 再营销、SD 老品导流每次只能选择一种；可同时选择 SP。</p>
           <div class="module-grid" id="module-options"></div>
           <div class="actions">
             <button class="primary" type="button" id="continue-to-evidence">继续完善方案</button>
@@ -158,52 +160,55 @@
           <h2>完善广告框架资料</h2>
           <p class="sub">只填写你选择的广告类型所需内容。卖家填写只代表“已确认”，不代表外部验证。</p>
 
-          <div class="evidence-block" data-module-evidence="sp" hidden>
-            <h3>SP 基础投放</h3>
-            <p class="evidence-note">基础目标已经记录。关键词和商品定向仍需经过外部证据与人工复核，系统不会猜测。</p>
-          </div>
+          <form id="evidence-form">
 
-          <div class="evidence-block" data-module-evidence="sb" hidden>
-            <h3>SB 品牌推广</h3>
-            <div class="field-grid">
-              <label>品牌注册状态
-                <select name="brand_registry_status"><option value="">未知</option><option value="enrolled">卖家确认已注册</option></select>
-                <span class="hint">卖家确认不等于 Amazon 账户验证。</span>
-              </label>
-              <label>SB 广告目标
-                <select name="sb_campaign_goal"><option value="">未确认</option><option value="brand_defense">品牌防守</option><option value="new_product_launch">新品启动</option></select>
-              </label>
+            <div class="evidence-block" data-module-evidence="sp" hidden>
+              <h3>SP 基础投放</h3>
+              <p class="evidence-note">基础目标已经记录。关键词和商品定向仍需经过外部证据与人工复核，系统不会猜测。</p>
             </div>
-          </div>
 
-          <div class="evidence-block" data-module-evidence="sd" hidden>
-            <h3>SD 再营销</h3>
-            <div class="field-grid">
-              <label>SD 广告目标
-                <select name="sd_campaign_goal"><option value="">未确认</option><option value="remarketing">浏览或购买再营销</option><option value="new_product_launch">新品启动</option></select>
-              </label>
+            <div class="evidence-block" data-module-evidence="sb" hidden>
+              <h3>SB 品牌推广</h3>
+              <div class="field-grid">
+                <label>品牌注册状态
+                  <select name="brand_registry_status"><option value="">未知</option><option value="enrolled">卖家确认已注册</option></select>
+                  <span class="hint">卖家确认不等于 Amazon 账户验证。</span>
+                </label>
+                <label>SB 广告目标
+                  <select name="sb_campaign_goal"><option value="">未确认</option><option value="brand_defense">品牌防守</option><option value="new_product_launch">新品启动</option></select>
+                </label>
+              </div>
             </div>
-            <p class="evidence-note">展示广告资格需要外部验证；选择本模块不会自动把资格标记为已验证。</p>
-          </div>
 
-          <div class="evidence-block" data-module-evidence="sd_cross_sell" hidden>
-            <h3>SD 老品导流</h3>
-            <div class="field-grid">
-              <label>新品 ASIN<input name="new_product_asin" placeholder="例如 B0..."></label>
-              <label>老品 ASIN（逗号分隔）<input name="old_product_asins" placeholder="例如 B0..., B0..."></label>
-              <label>新老品关系
-                <select name="catalog_relationship"><option value="">未知</option><option value="complementary">互补</option><option value="upgrade_path">升级路径</option><option value="compatible">兼容</option><option value="substitute">替代</option></select>
-              </label>
-              <label>库存健康度
-                <select name="inventory_health"><option value="">未知</option><option value="healthy">健康</option><option value="at_risk">有风险</option></select>
-              </label>
-              <label>单品贡献毛利（%）<input name="contribution_margin" type="number" min="0" max="100" step="0.01"></label>
+            <div class="evidence-block" data-module-evidence="sd" hidden>
+              <h3>SD 再营销</h3>
+              <div class="field-grid">
+                <label>SD 广告目标
+                  <select name="sd_campaign_goal"><option value="">未确认</option><option value="remarketing">浏览或购买再营销</option><option value="new_product_launch">新品启动</option></select>
+                </label>
+              </div>
+              <p class="evidence-note">展示广告资格需要外部验证；选择本模块不会自动把资格标记为已验证。</p>
             </div>
-          </div>
 
-          <div class="actions">
-            <button class="primary" type="button" id="review-evidence">检查所选广告资料</button>
-          </div>
+            <div class="evidence-block" data-module-evidence="sd_cross_sell" hidden>
+              <h3>SD 老品导流</h3>
+              <div class="field-grid">
+                <label>新品 ASIN<input name="new_product_asin" placeholder="例如 B0..."></label>
+                <label>老品 ASIN（逗号分隔）<input name="old_product_asins" placeholder="例如 B0..., B0..."></label>
+                <label>新老品关系
+                  <select name="catalog_relationship"><option value="">未知</option><option value="complementary">互补</option><option value="upgrade_path">升级路径</option><option value="compatible">兼容</option><option value="substitute">替代</option></select>
+                </label>
+                <label>库存健康度
+                  <select name="inventory_health"><option value="">未知</option><option value="healthy">健康</option><option value="at_risk">有风险</option></select>
+                </label>
+                <label>单品贡献毛利（%）<input name="contribution_margin" type="number" min="0" max="100" step="0.01"></label>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="primary" type="submit" id="review-evidence">检查所选广告资料</button>
+            </div>
+          </form>
         </section>
 
         <section class="panel workflow-step" id="review-plan" hidden>
@@ -282,6 +287,7 @@
   <script>
     const token = new URLSearchParams(location.hash.slice(1)).get('token');
     const form = document.querySelector('#intake-form');
+    const evidenceForm = document.querySelector('#evidence-form');
     const message = document.querySelector('#message');
     const numeric = ['monthly_sales_target','product_price_usd','target_tacos_percent','ad_sales_share_percent','benchmark_cpc_usd','benchmark_cvr_percent','contribution_margin'];
     const moduleEvidenceFields = {
@@ -290,10 +296,10 @@
     };
 
     const AD_MODULES = [
-      {id:'sp', title:'SP 基础投放', description:'验证关键词和商品投放方向。'},
-      {id:'sb', title:'SB 品牌推广', description:'用于品牌防守、品牌词或品类词推广。'},
-      {id:'sd', title:'SD 再营销', description:'面向浏览或购买行为进行再营销。'},
-      {id:'sd_cross_sell', title:'SD 老品导流', description:'通过相关老品为新品引流。'}
+      {id:'sp', title:'SP 基础投放', advanced:false, description:'验证关键词和商品投放方向。'},
+      {id:'sb', title:'SB 品牌推广', advanced:true, description:'用于品牌防守、品牌词或品类词推广。'},
+      {id:'sd', title:'SD 再营销', advanced:true, description:'面向浏览或购买行为进行再营销。'},
+      {id:'sd_cross_sell', title:'SD 老品导流', advanced:true, description:'通过相关老品为新品引流。'}
     ];
 
     const workflowState = {
@@ -304,11 +310,24 @@
 
     document.querySelector('#module-options').innerHTML = AD_MODULES.map(module => `
       <label class="module-card">
-        <input type="checkbox" value="${module.id}" data-ad-module>
+        <input type="checkbox" value="${module.id}" data-ad-module data-advanced-module="${module.advanced}" aria-describedby="advanced-module-rule">
         <strong>${module.title}</strong>
         <span>${module.description}</span>
       </label>
     `).join('');
+
+    const moduleInputs = [...document.querySelectorAll('[data-ad-module]')];
+
+    function enforceAdvancedModuleExclusivity(changedInput){
+      if(!changedInput.checked || changedInput.dataset.advancedModule !== 'true') return;
+      moduleInputs.forEach(other => {
+        if(other !== changedInput && other.dataset.advancedModule === 'true') other.checked = false;
+      });
+    }
+
+    moduleInputs.forEach(input => {
+      input.addEventListener('change', () => enforceAdvancedModuleExclusivity(input));
+    });
 
     const payload = () => Object.fromEntries(
       [...new FormData(form)].map(([key,value]) => [key, numeric.includes(key) ? Number(value) : value])
@@ -360,10 +379,10 @@
       message.className = error ? 'error' : '';
     }
 
-    function revealStep(id){
+    function revealStep(id, shouldScroll=true){
       const section = document.getElementById(id);
       section.hidden = false;
-      section.scrollIntoView({behavior:'smooth',block:'start'});
+      if(shouldScroll) section.scrollIntoView({behavior:'smooth',block:'start'});
     }
 
     function money(value){ return '$' + Number(value).toFixed(2); }
@@ -397,6 +416,47 @@
       document.querySelector('#feasibility-details').innerHTML = renderLevers(result);
     }
 
+    function updateFeasibilityStatus(result){
+      document.querySelector('#run-status').textContent =
+        '数据来源：卖家填写\n' +
+        '外部数据：未使用\n' +
+        '模型调用：0 次\n' +
+        (result.is_feasible_at_benchmark
+          ? '状态：目标预算已计算 · 当前假设可行'
+          : '状态：目标预算已计算 · 存在数值冲突');
+    }
+
+    function syncEvidenceSections(){
+      document.querySelectorAll('[data-module-evidence]').forEach(section => {
+        const selected = workflowState.selectedModules.has(section.dataset.moduleEvidence);
+        section.hidden = !selected;
+        section.querySelectorAll('input,select,textarea').forEach(control => {
+          control.disabled = !selected;
+        });
+      });
+    }
+
+    function resetDownstream(){
+      workflowState.selectedModules = new Set();
+      workflowState.evidenceContext = {};
+      moduleInputs.forEach(input => { input.checked = false; });
+      evidenceForm.reset();
+      syncEvidenceSections();
+      document.querySelector('#feasibility-result').hidden = true;
+      document.querySelector('#module-selection').hidden = true;
+      document.querySelector('#strategy-evidence').hidden = true;
+      document.querySelector('#review-plan').hidden = true;
+      document.querySelector('#selected-gate-summary').innerHTML = '';
+      document.querySelector('#technical-gate-details').innerHTML = '';
+      document.querySelector('#architecture-data').innerHTML = '';
+      document.querySelector('#demo-report').classList.remove('visible');
+      document.querySelector('#demo-report-body').innerHTML = '';
+      document.querySelector('#run-status').textContent =
+        '数据来源：卖家填写\n外部数据：未使用\n模型调用：0 次\n状态：正在重新计算预算';
+    }
+
+    syncEvidenceSections();
+
     async function save(){
       if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
       const draft = await api('/api/draft',{method:'PUT',body:JSON.stringify(payload())});
@@ -410,6 +470,7 @@
       event.preventDefault();
       try {
         if(!token) throw new Error('启动链接缺少本地会话令牌，请重新打开工作台。');
+        resetDownstream();
         tell('正在计算目标预算…');
         const result = await api('/api/feasibility', {
           method:'POST',
@@ -417,8 +478,9 @@
         });
         workflowState.feasibility = result;
         renderFeasibility(result);
+        updateFeasibilityStatus(result);
         revealStep('feasibility-result');
-        revealStep('module-selection');
+        revealStep('module-selection', false);
         tell(
           result.is_feasible_at_benchmark
             ? '基础预算已计算，当前假设下未检测到冲突。'
@@ -437,9 +499,7 @@
         tell('请选择至少一种广告类型，或点击“暂时只确认总预算”。', true);
         return;
       }
-      document.querySelectorAll('[data-module-evidence]').forEach(section => {
-        section.hidden = !workflowState.selectedModules.has(section.dataset.moduleEvidence);
-      });
+      syncEvidenceSections();
       revealStep('strategy-evidence');
       tell('已只显示所选广告类型需要的资料。');
     });
@@ -447,8 +507,8 @@
     document.querySelector('#budget-only').addEventListener('click', () => {
       workflowState.selectedModules = new Set();
       workflowState.evidenceContext = {};
-      document.querySelectorAll('[data-ad-module]').forEach(input => { input.checked = false; });
-      document.querySelectorAll('[data-module-evidence]').forEach(section => { section.hidden = true; });
+      moduleInputs.forEach(input => { input.checked = false; });
+      syncEvidenceSections();
       document.querySelector('#strategy-evidence').hidden = true;
       document.querySelector('#selected-gate-summary').innerHTML = '<p class="evidence-note">本次只确认总预算；未选择 SB 或 SD，因此无需补充对应资料。</p>';
       document.querySelector('#technical-gate-details').innerHTML = '';
@@ -472,9 +532,15 @@
       return gates;
     }
 
-    document.querySelector('#review-evidence').addEventListener('click', async () => {
+    evidenceForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if(!evidenceForm.reportValidity()){
+        tell('请先修正所选广告资料中的数值或格式。', true);
+        return;
+      }
       try {
         tell('正在检查所选广告资料…');
+        evidenceContext();
         await checkGates();
         document.querySelector('#selected-gate-summary').innerHTML = `<p class="evidence-note">已记录 ${workflowState.selectedModules.size} 种广告目标。请展开规则与证据详情复核缺口；演示报告仍不可直接执行。</p>`;
         revealStep('review-plan');

@@ -21,6 +21,10 @@ class InputAttributeParser(HTMLParser):
 
 
 class WorkbenchAssetContractTests(unittest.TestCase):
+    def assert_appears_in_order(self, source, *markers):
+        positions = [source.index(marker) for marker in markers]
+        self.assertEqual(positions, sorted(positions))
+
     def test_page_reveals_the_progressive_seller_workflow_in_order(self):
         page = ASSET.read_text(encoding="utf-8")
 
@@ -97,6 +101,116 @@ class WorkbenchAssetContractTests(unittest.TestCase):
         parser.feed(ASSET.read_text(encoding="utf-8"))
 
         self.assertEqual(parser.inputs["benchmark_cvr_percent"].get("step"), "0.01")
+
+    def test_calculation_scrolls_to_feasibility_and_reveals_modules_without_second_scroll(self):
+        page = ASSET.read_text(encoding="utf-8")
+        handler = page[page.index("form.addEventListener('submit'"):page.index(
+            "document.querySelector('#continue-to-evidence')"
+        )]
+
+        self.assertIn("function revealStep(id, shouldScroll=true)", page)
+        self.assertIn("if(shouldScroll)", page)
+        self.assert_appears_in_order(
+            handler,
+            "renderFeasibility(result);",
+            "revealStep('feasibility-result');",
+            "revealStep('module-selection', false);",
+        )
+
+    def test_evidence_controls_belong_to_validated_form_and_hidden_controls_are_disabled(self):
+        page = ASSET.read_text(encoding="utf-8")
+        evidence_form = page[page.index('<form id="evidence-form"'):page.index(
+            "</form>", page.index('<form id="evidence-form"')
+        )]
+
+        for field in (
+            'name="brand_registry_status"',
+            'name="sd_campaign_goal"',
+            'name="contribution_margin"',
+        ):
+            self.assertIn(field, evidence_form)
+        self.assertIn('id="review-evidence"', evidence_form)
+        self.assertIn('type="submit"', evidence_form)
+        self.assertIn("evidenceForm.addEventListener('submit'", page)
+        self.assertIn("if(!evidenceForm.reportValidity())", page)
+        self.assertIn(
+            "workflowState.selectedModules.has(section.dataset.moduleEvidence)", page
+        )
+        self.assertIn("section.hidden = !selected", page)
+        self.assertIn("control.disabled = !selected", page)
+        self.assertIn("syncEvidenceSections();", page)
+
+    def test_advanced_modules_are_mutually_exclusive_but_sp_can_remain_selected(self):
+        page = ASSET.read_text(encoding="utf-8")
+
+        self.assertIn("SB、SD 再营销、SD 老品导流每次只能选择一种；可同时选择 SP。", page)
+        self.assertIn("{id:'sp', title:'SP 基础投放', advanced:false", page)
+        for module_id in ("sb", "sd", "sd_cross_sell"):
+            self.assertIn(f"{{id:'{module_id}'", page)
+        self.assertGreaterEqual(page.count("advanced:true"), 3)
+        self.assertIn("function enforceAdvancedModuleExclusivity(changedInput)", page)
+        self.assertIn("other.checked = false", page)
+        self.assertIn("enforceAdvancedModuleExclusivity(input)", page)
+
+    def test_recalculation_resets_downstream_state_before_feasibility_request(self):
+        page = ASSET.read_text(encoding="utf-8")
+        handler = page[page.index("form.addEventListener('submit'"):page.index(
+            "document.querySelector('#continue-to-evidence')"
+        )]
+
+        self.assert_appears_in_order(
+            handler,
+            "resetDownstream();",
+            "api('/api/feasibility'",
+            "renderFeasibility(result);",
+        )
+        for reset_contract in (
+            "workflowState.selectedModules = new Set();",
+            "document.querySelector('#strategy-evidence').hidden = true;",
+            "document.querySelector('#review-plan').hidden = true;",
+            "document.querySelector('#selected-gate-summary').innerHTML = '';",
+            "document.querySelector('#technical-gate-details').innerHTML = '';",
+            "document.querySelector('#architecture-data').innerHTML = '';",
+            "document.querySelector('#demo-report').classList.remove('visible');",
+        ):
+            self.assertIn(reset_contract, page)
+
+    def test_endpoint_wiring_validates_evidence_before_gate_review(self):
+        page = ASSET.read_text(encoding="utf-8")
+        review_handler = page[page.index("evidenceForm.addEventListener('submit'"):page.index(
+            "document.querySelector('#gates-button')"
+        )]
+
+        self.assert_appears_in_order(
+            review_handler,
+            "evidenceForm.reportValidity()",
+            "evidenceContext();",
+            "await checkGates();",
+            "revealStep('review-plan');",
+        )
+        for endpoint in (
+            "api('/api/feasibility'",
+            "api('/api/gates'",
+            "api('/api/campaign-architecture'",
+            "api('/api/demo-report'",
+        ):
+            self.assertIn(endpoint, page)
+
+    def test_feasibility_updates_persistent_sidebar_for_both_outcomes(self):
+        page = ASSET.read_text(encoding="utf-8")
+        handler = page[page.index("form.addEventListener('submit'"):page.index(
+            "document.querySelector('#continue-to-evidence')"
+        )]
+
+        self.assertIn("function updateFeasibilityStatus(result)", page)
+        self.assertIn("状态：目标预算已计算 · 当前假设可行", page)
+        self.assertIn("状态：目标预算已计算 · 存在数值冲突", page)
+        self.assert_appears_in_order(
+            handler,
+            "renderFeasibility(result);",
+            "updateFeasibilityStatus(result);",
+            "revealStep('feasibility-result');",
+        )
 
 
 if __name__ == "__main__":

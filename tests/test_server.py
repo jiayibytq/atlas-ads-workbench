@@ -158,12 +158,65 @@ class LocalServerTests(unittest.TestCase):
 
     def test_authorized_client_can_evaluate_versioned_gates(self):
         status, gates = self.request(
-            "/api/gates", "POST", valid_payload(), token="test-token"
+            "/api/gates",
+            "POST",
+            {"intake": valid_payload(), "selected_ad_modules": ["sb"]},
+            token="test-token",
         )
 
         self.assertEqual(status, 200)
-        self.assertEqual(gates["SB-GATE-001"]["status"], "information_required")
+        self.assertEqual(gates["SB-GATE-001"]["status"], "verification_required")
         self.assertIn("brand_registry_status", gates["SB-GATE-001"]["missing_fields"])
+
+    def test_gates_only_evaluate_selected_modules(self):
+        status, gates = self.request(
+            "/api/gates",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sb"],
+                "evidence_context": {},
+            },
+            token="test-token",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(gates["SB-GATE-001"]["status"], "verification_required")
+        self.assertEqual(gates["SD-GATE-001"]["status"], "not_applicable")
+
+    def test_run_freezes_selected_modules(self):
+        status, manifest = self.request(
+            "/api/runs",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sp", "sd_cross_sell"],
+                "evidence_context": {},
+            },
+            token="test-token",
+        )
+        _, run = self.request("/api/runs/%s" % manifest["run_id"], token="test-token")
+
+        self.assertEqual(status, 201)
+        self.assertEqual(
+            run["decision_plan"]["selected_ad_modules"],
+            ["sp", "sd_cross_sell"],
+        )
+
+    def test_api_rejects_unknown_ad_module(self):
+        with self.assertRaises(HTTPError) as error:
+            self.request(
+                "/api/gates",
+                "POST",
+                {
+                    "intake": valid_payload(),
+                    "selected_ad_modules": ["unsupported"],
+                    "evidence_context": {},
+                },
+                token="test-token",
+            )
+
+        self.assertEqual(error.exception.code, 400)
 
     def test_gates_accept_a_source_neutral_evidence_envelope(self):
         status, gates = self.request(
@@ -171,6 +224,7 @@ class LocalServerTests(unittest.TestCase):
             "POST",
             {
                 "intake": valid_payload(),
+                "selected_ad_modules": ["sb"],
                 "evidence_context": {
                     "campaign_goal": {"value": "cross_sell", "status": "confirmed"}
                 }

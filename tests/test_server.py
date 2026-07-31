@@ -202,6 +202,35 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(evidence["source"], "seller_input")
         self.assertTrue(evidence["captured_at"])
 
+    def test_demo_report_endpoint_creates_and_returns_the_same_frozen_report(self):
+        status, response = self.request(
+            "/api/demo-report",
+            "POST",
+            {"intake": valid_payload(), "evidence_context": {}},
+            token="test-token",
+        )
+        run_id = response["run"]["run_id"]
+        _, saved = self.request("/api/runs/%s" % run_id, token="test-token")
+
+        self.assertEqual(status, 201)
+        self.assertEqual(response["report"]["report_type"], "demo")
+        self.assertFalse(response["report"]["is_executable"])
+        self.assertEqual(len(response["report"]["rows"]), 3)
+        self.assertEqual(
+            saved["decision_plan"]["demo_report"],
+            response["report"],
+        )
+        self.assertEqual(
+            saved["manifest"]["decision_plan_sha256"],
+            response["run"]["decision_plan_sha256"],
+        )
+
+    def test_demo_report_endpoint_requires_the_local_session_token(self):
+        with self.assertRaises(HTTPError) as error:
+            self.request("/api/demo-report", "POST", valid_payload())
+
+        self.assertEqual(error.exception.code, 401)
+
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(
             self.base_url + "/api/draft",

@@ -10,6 +10,7 @@ from typing import Any, Dict
 from urllib.parse import urlsplit
 
 from .campaign_architecture import build_campaign_architecture
+from .demo_report import build_demo_report
 from .evidence import EvidenceValidationError, normalize_evidence_context
 from .feasibility import calculate_feasibility
 from .gates import evaluate_gates
@@ -134,7 +135,13 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in {"/api/runs", "/api/feasibility", "/api/campaign-architecture", "/api/gates"}:
+        if path not in {
+            "/api/runs",
+            "/api/feasibility",
+            "/api/campaign-architecture",
+            "/api/gates",
+            "/api/demo-report",
+        }:
             self._error(404, "not_found", "The requested local resource does not exist.")
             return
         if not self._is_authorized():
@@ -165,6 +172,16 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 "gates": gates,
                 "campaign_architecture": architecture,
             }
+            if path == "/api/demo-report":
+                demo_report = build_demo_report(feasibility)
+                decision_plan["demo_report"] = demo_report
+                manifest = self.app_server.storage.create_run(
+                    intake,
+                    self.app_server.workbench_version,
+                    decision_plan,
+                )
+                self._send_json(201, {"run": manifest, "report": demo_report})
+                return
             manifest = self.app_server.storage.create_run(
                 intake,
                 self.app_server.workbench_version,

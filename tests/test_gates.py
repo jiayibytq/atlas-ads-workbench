@@ -30,7 +30,8 @@ class GateTests(unittest.TestCase):
         gates = evaluate_gates(current_intake, calculate_feasibility(current_intake), {})
         gate = gates["FEASIBILITY-GATE-001"]
 
-        self.assertEqual(gate["status"], "ready_for_rule_evaluation")
+        self.assertEqual(gate["status"], "constraint_conflict")
+        self.assertEqual(gate["seller_status"], "存在数值冲突")
         self.assertEqual(gate["conflicting_fields"], ["benchmark_cvr_percent"])
         self.assertEqual(gate["missing_fields"], [])
 
@@ -42,19 +43,66 @@ class GateTests(unittest.TestCase):
             "campaign_goal": evidence("brand_defense"),
             "eligible_advertised_asins": evidence(["B0NEW123"], "verified"),
         }
-        gates = evaluate_gates(current_intake, calculate_feasibility(current_intake), context)
+        gates = evaluate_gates(
+            current_intake,
+            calculate_feasibility(current_intake),
+            context,
+            selected_ad_modules=["sb"],
+        )
 
         self.assertEqual(gates["SB-GATE-001"]["status"], "ready_for_rule_evaluation")
 
     def test_sd_gate_names_missing_evidence_without_inferring_it(self):
         current_intake = intake()
-        gates = evaluate_gates(current_intake, calculate_feasibility(current_intake), {})
+        gates = evaluate_gates(
+            current_intake,
+            calculate_feasibility(current_intake),
+            {},
+            selected_ad_modules=["sd"],
+        )
         gate = gates["SD-GATE-001"]
 
-        self.assertEqual(gate["status"], "information_required")
+        self.assertEqual(gate["status"], "verification_required")
         self.assertIn("display_eligibility_status", gate["missing_fields"])
         self.assertIn("catalog_relationship", gate["missing_fields"])
         self.assertEqual(gate["next_action"]["type"], "collect_seller_input")
+
+    def test_budget_only_path_does_not_mark_sb_or_sd_as_missing(self):
+        current_intake = intake()
+        gates = evaluate_gates(
+            current_intake,
+            calculate_feasibility(current_intake),
+            {},
+            selected_ad_modules=[],
+        )
+
+        self.assertEqual(gates["SB-GATE-001"]["status"], "not_applicable")
+        self.assertEqual(gates["SD-GATE-001"]["status"], "not_applicable")
+        self.assertFalse(gates["SB-GATE-001"]["applicable"])
+
+    def test_only_selected_module_is_evaluated(self):
+        current_intake = intake()
+        gates = evaluate_gates(
+            current_intake,
+            calculate_feasibility(current_intake),
+            {},
+            selected_ad_modules=["sb"],
+        )
+
+        self.assertEqual(gates["SB-GATE-001"]["status"], "verification_required")
+        self.assertEqual(gates["SD-GATE-001"]["status"], "not_applicable")
+
+    def test_feasibility_conflict_has_an_unambiguous_status(self):
+        current_intake = intake()
+        gate = evaluate_gates(
+            current_intake,
+            calculate_feasibility(current_intake),
+            {},
+            selected_ad_modules=[],
+        )["FEASIBILITY-GATE-001"]
+
+        self.assertEqual(gate["status"], "constraint_conflict")
+        self.assertEqual(gate["seller_status"], "存在数值冲突")
 
 
 if __name__ == "__main__":

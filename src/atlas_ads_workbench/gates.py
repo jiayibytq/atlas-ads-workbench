@@ -5,6 +5,23 @@ from typing import Any, Dict, Mapping, Sequence
 
 VALID_EVIDENCE_STATUSES = {"confirmed", "verified", "external_evidence"}
 
+SB_REQUIRED_EVIDENCE = [
+    {"field": "advertiser_account_status", "accepted_statuses": ["verified"]},
+    {"field": "brand_registry_status", "accepted_statuses": ["verified"], "accepted_values": ["enrolled"]},
+    {"field": "campaign_goal", "accepted_statuses": ["confirmed"]},
+    {"field": "eligible_advertised_asins", "accepted_statuses": ["verified", "external_evidence"]},
+]
+
+SD_REQUIRED_EVIDENCE = [
+    {"field": "display_eligibility_status", "accepted_statuses": ["verified"]},
+    {"field": "campaign_goal", "accepted_statuses": ["confirmed"]},
+    {"field": "new_product_asin", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
+    {"field": "old_product_asins", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
+    {"field": "catalog_relationship", "accepted_statuses": ["confirmed"], "accepted_values": ["complementary", "upgrade_path", "compatible"]},
+    {"field": "inventory_health", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
+    {"field": "contribution_margin", "accepted_statuses": ["confirmed", "external_evidence"]},
+]
+
 
 def _evidence_passes(
     context: Mapping[str, Any], field: str, accepted_statuses: Sequence[str], accepted_values=None
@@ -36,10 +53,25 @@ def _evidence_gate(
             passed_fields.append(field)
         else:
             missing_fields.append(field)
+    missing_external = [
+        rule["field"]
+        for rule in required
+        if "verified" in rule.get("accepted_statuses", [])
+        and rule["field"] in missing_fields
+    ]
+    status = "verification_required" if missing_external else "information_required"
+    seller_status = "等待外部验证" if missing_external else "待补充资料"
     return {
         "gate_id": gate_id,
-        "version": 1,
-        "status": "ready_for_rule_evaluation" if not missing_fields else "information_required",
+        "version": 2,
+        "applicable": True,
+        "status": "ready_for_rule_evaluation" if not missing_fields else status,
+        "seller_status": "资料已齐全" if not missing_fields else seller_status,
+        "seller_message": (
+            "资料已达到规则评估条件。"
+            if not missing_fields
+            else "只补充已选择广告类型所需的资料；系统不会猜测缺失证据。"
+        ),
         "passed_fields": passed_fields,
         "missing_fields": missing_fields,
         "stale_fields": [],
@@ -51,15 +83,42 @@ def _evidence_gate(
     }
 
 
+def _not_applicable_gate(gate_id: str) -> Dict[str, Any]:
+    return {
+        "gate_id": gate_id,
+        "version": 2,
+        "applicable": False,
+        "status": "not_applicable",
+        "seller_status": "未选择",
+        "seller_message": "你没有选择此广告类型，因此本次无需补充资料。",
+        "passed_fields": [],
+        "missing_fields": [],
+        "stale_fields": [],
+        "conflicting_fields": [],
+        "next_action": {"type": "none", "label": "No action required."},
+    }
+
+
 def evaluate_gates(
-    intake: Mapping[str, Any], feasibility: Mapping[str, Any], context: Mapping[str, Any]
+    intake: Mapping[str, Any],
+    feasibility: Mapping[str, Any],
+    context: Mapping[str, Any],
+    selected_ad_modules: Sequence[str] = (),
 ) -> Dict[str, Dict[str, Any]]:
     """Evaluate stable gate contracts before strategy rules or agent prose."""
 
+    has_conflict = not feasibility["is_feasible_at_benchmark"]
     feasibility_gate = {
         "gate_id": "FEASIBILITY-GATE-001",
-        "version": 1,
-        "status": "ready_for_rule_evaluation",
+        "version": 2,
+        "applicable": True,
+        "status": "constraint_conflict" if has_conflict else "ready_for_rule_evaluation",
+        "seller_status": "存在数值冲突" if has_conflict else "目标可行",
+        "seller_message": (
+            "预算可以计算，但当前 CPC、CVR、TACoS 与广告销售占比不能同时满足。"
+            if has_conflict
+            else "基础信息完整，当前假设下未检测到数值冲突。"
+        ),
         "passed_fields": [
             "monthly_sales_target", "product_price_usd", "target_tacos_percent",
             "ad_sales_share_percent", "benchmark_cpc_usd", "benchmark_cvr_percent",
@@ -67,37 +126,25 @@ def evaluate_gates(
         "missing_fields": [],
         "stale_fields": [],
         "conflicting_fields": (
-            [] if feasibility["is_feasible_at_benchmark"] else ["benchmark_cvr_percent"]
+            [] if not has_conflict else ["benchmark_cvr_percent"]
         ),
         "next_action": {
             "type": "human_review",
             "label": "Resolve the visible feasibility conflict before committing campaign budgets."
-            if not feasibility["is_feasible_at_benchmark"]
+            if has_conflict
             else "Feasibility inputs are ready for downstream evidence gates.",
         },
     }
-    sb_gate = _evidence_gate(
-        "SB-GATE-001",
-        [
-            {"field": "advertiser_account_status", "accepted_statuses": ["verified"]},
-            {"field": "brand_registry_status", "accepted_statuses": ["verified"], "accepted_values": ["enrolled"]},
-            {"field": "campaign_goal", "accepted_statuses": ["confirmed"]},
-            {"field": "eligible_advertised_asins", "accepted_statuses": ["verified", "external_evidence"]},
-        ],
-        context,
+    selected = set(selected_ad_modules)
+    sb_gate = (
+        _evidence_gate("SB-GATE-001", SB_REQUIRED_EVIDENCE, context)
+        if "sb" in selected
+        else _not_applicable_gate("SB-GATE-001")
     )
-    sd_gate = _evidence_gate(
-        "SD-GATE-001",
-        [
-            {"field": "display_eligibility_status", "accepted_statuses": ["verified"]},
-            {"field": "campaign_goal", "accepted_statuses": ["confirmed"]},
-            {"field": "new_product_asin", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
-            {"field": "old_product_asins", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
-            {"field": "catalog_relationship", "accepted_statuses": ["confirmed"], "accepted_values": ["complementary", "upgrade_path", "compatible"]},
-            {"field": "inventory_health", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
-            {"field": "contribution_margin", "accepted_statuses": ["confirmed", "external_evidence"]},
-        ],
-        context,
+    sd_gate = (
+        _evidence_gate("SD-GATE-001", SD_REQUIRED_EVIDENCE, context)
+        if selected.intersection({"sd", "sd_cross_sell"})
+        else _not_applicable_gate("SD-GATE-001")
     )
     return {
         "FEASIBILITY-GATE-001": feasibility_gate,

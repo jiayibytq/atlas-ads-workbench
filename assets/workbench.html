@@ -190,6 +190,10 @@
                 <label>SD 广告目标
                   <select name="sd_campaign_goal"><option value="">未确认</option><option value="remarketing">浏览或购买再营销</option><option value="new_product_launch">新品启动</option></select>
                 </label>
+                <label>推广商品 ASIN<input name="new_product_asin" placeholder="例如 B0..."></label>
+                <label>库存健康度
+                  <select name="inventory_health"><option value="">未知</option><option value="healthy">健康</option><option value="at_risk">有风险</option></select>
+                </label>
               </div>
               <p class="evidence-note">展示广告资格需要外部验证；选择本模块不会自动把资格标记为已验证。</p>
             </div>
@@ -297,6 +301,7 @@
     const numeric = ['monthly_sales_target','product_price_usd','target_tacos_percent','ad_sales_share_percent','benchmark_cpc_usd','benchmark_cvr_percent','contribution_margin'];
     const moduleEvidenceFields = {
       sb: ['brand_registry_status'],
+      sd: ['new_product_asin','inventory_health'],
       sd_cross_sell: ['new_product_asin','catalog_relationship','inventory_health','contribution_margin']
     };
 
@@ -339,7 +344,7 @@
     );
 
     function fieldValue(name){
-      const field = document.querySelector(`[name="${name}"]`);
+      const field = [...document.querySelectorAll(`[name="${name}"]`)].find(field => !field.disabled);
       return field ? field.value : '';
     }
 

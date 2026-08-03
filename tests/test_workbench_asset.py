@@ -158,6 +158,21 @@ class WorkbenchAssetContractTests(unittest.TestCase):
         self.assertIn("control.disabled = !selected", page)
         self.assertIn("syncEvidenceSections();", page)
 
+    def test_standard_sd_collects_the_evidence_its_gate_requires(self):
+        page = ASSET.read_text(encoding="utf-8")
+        standard_sd = page[page.index('data-module-evidence="sd"'):page.index(
+            'data-module-evidence="sd_cross_sell"'
+        )]
+
+        for field in ('name="new_product_asin"', 'name="inventory_health"'):
+            self.assertIn(field, standard_sd)
+        self.assertIn("sd: ['new_product_asin','inventory_health']", page)
+        self.assertIn(
+            "sd_cross_sell: ['new_product_asin','catalog_relationship','inventory_health','contribution_margin']",
+            page,
+        )
+        self.assertIn("find(field => !field.disabled)", page)
+
     def test_advanced_modules_are_mutually_exclusive_but_sp_can_remain_selected(self):
         page = ASSET.read_text(encoding="utf-8")
 

@@ -235,6 +235,33 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("campaign_goal", gates["SB-GATE-001"]["passed_fields"])
 
+    def test_standard_sd_accepts_its_own_evidence_without_cross_sell_fields(self):
+        status, gates = self.request(
+            "/api/gates",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sd"],
+                "evidence_context": {
+                    "display_eligibility_status": {
+                        "value": "eligible",
+                        "status": "verified",
+                        "source": "amazon_ads_mcp",
+                    },
+                    "campaign_goal": {"value": "remarketing", "status": "confirmed"},
+                    "new_product_asin": {"value": "B0NEW123", "status": "confirmed"},
+                    "inventory_health": {"value": "healthy", "status": "confirmed"},
+                },
+            },
+            token="test-token",
+        )
+
+        gate = gates["SD-GATE-001"]
+        self.assertEqual(status, 200)
+        self.assertEqual(gate["status"], "ready_for_rule_evaluation")
+        self.assertNotIn("old_product_asins", gate["missing_fields"])
+        self.assertNotIn("contribution_margin", gate["missing_fields"])
+
     def test_run_freezes_normalized_evidence_context_with_the_decision(self):
         status, manifest = self.request(
             "/api/runs",

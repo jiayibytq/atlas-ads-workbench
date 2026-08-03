@@ -112,6 +112,19 @@ class SkillUpdaterTests(unittest.TestCase):
         self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
         self.assertEqual(self._git_metadata_snapshot(), metadata_before)
 
+    def test_check_refuses_dirty_or_untracked_checkout_without_writing_metadata(self):
+        updater = load_updater()
+        original_head = run_git(self.checkout, "rev-parse", "HEAD")
+        self._publish_update()
+        write_text(self.checkout / "seller-local-note.txt", "do not overwrite\n")
+        metadata_before = self._git_metadata_snapshot()
+
+        result = updater.run_update(self.checkout, mode="check")
+
+        self.assertEqual(result["status"], "refused_dirty")
+        self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(self._git_metadata_snapshot(), metadata_before)
+
     def test_check_refuses_diverged_history_without_writing_checkout_metadata(self):
         updater = load_updater()
         write_text(self.checkout / "local-only.txt", "local\n")
@@ -339,6 +352,16 @@ class SkillUpdaterTests(unittest.TestCase):
 
         self.assertEqual(updated["status"], "updated")
         self.assertEqual(run_git(linked_worktree, "rev-parse", "HEAD"), target_head)
+
+    def test_check_fetches_a_relative_local_remote_from_temporary_object_store(self):
+        updater = load_updater()
+        target_head = self._publish_update()
+        run_git(self.checkout, "remote", "set-url", "origin", "../remote.git")
+
+        result = updater.run_update(self.checkout, mode="check")
+
+        self.assertEqual(result["status"], "update_available")
+        self.assertEqual(result["target_commit"], target_head)
 
     def _git_metadata_snapshot(self):
         git_directory = Path(run_git(self.checkout, "rev-parse", "--git-dir"))

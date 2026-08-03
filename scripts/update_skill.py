@@ -176,21 +176,14 @@ def inspect_target_read_only(repository, source, remote_ref):
         )
         if cloned.returncode:
             return None
-        remote_url = git(
-            repository,
-            "remote",
-            "get-url",
-            source["remote"],
-            check=False,
-            read_only=True,
-        )
-        if remote_url.returncode:
+        fetch_url = comparison_fetch_url(repository, source)
+        if fetch_url is None:
             return None
         fetched = git(
             object_store,
             "fetch",
             "--no-tags",
-            remote_url.stdout.strip(),
+            fetch_url,
             remote_ref,
             check=False,
         )
@@ -216,21 +209,14 @@ def target_fast_forwards_current_read_only(repository, source, current_commit, t
         )
         if cloned.returncode:
             return None
-        remote_url = git(
-            repository,
-            "remote",
-            "get-url",
-            source["remote"],
-            check=False,
-            read_only=True,
-        )
-        if remote_url.returncode:
+        fetch_url = comparison_fetch_url(repository, source)
+        if fetch_url is None:
             return None
         fetched = git(
             object_store,
             "fetch",
             "--no-tags",
-            remote_url.stdout.strip(),
+            fetch_url,
             "refs/heads/%s" % source["ref"],
             check=False,
         )
@@ -248,6 +234,30 @@ def target_fast_forwards_current_read_only(repository, source, current_commit, t
             check=False,
         )
         return relation.returncode == 0
+
+
+def comparison_fetch_url(repository, source):
+    """Return a safe fetch location that a temporary repository can resolve."""
+    remote_url = git(
+        repository,
+        "remote",
+        "get-url",
+        source["remote"],
+        check=False,
+        read_only=True,
+    )
+    if remote_url.returncode:
+        return None
+    raw_url = remote_url.stdout.strip()
+    if normalize_repository_url(raw_url, repository) != source["identity"]:
+        return None
+    if not source["identity"].startswith("local:"):
+        return raw_url
+    parsed = urlparse(raw_url)
+    local_path = Path(parsed.path) if parsed.scheme == "file" else Path(raw_url)
+    if not local_path.is_absolute():
+        local_path = Path(repository) / local_path
+    return str(local_path.resolve())
 
 
 def validation_command(repository):
@@ -313,14 +323,20 @@ def run_update(path, mode):
             result["status"] = "refused_detached"
             return result
 
-        if mode == "update":
-            status = git(repository, "status", "--porcelain", "--untracked-files=all", check=False)
-            if status.returncode:
-                result["status"] = "refused_unknown"
-                return result
-            if status.stdout.strip():
-                result["status"] = "refused_dirty"
-                return result
+        status = git(
+            repository,
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            check=False,
+            read_only=(mode == "check"),
+        )
+        if status.returncode:
+            result["status"] = "refused_unknown"
+            return result
+        if status.stdout.strip():
+            result["status"] = "refused_dirty"
+            return result
 
         result["target_commit"] = resolve_target(repository, source, mode)
         if not result["target_commit"]:

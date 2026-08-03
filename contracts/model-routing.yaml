@@ -1,7 +1,8 @@
 version: 1
 purpose: >-
   Route work to the least capable model that can complete it while preserving
-  a human approval boundary for real data, external systems, and executable actions.
+  a human approval boundary for external or sensitive seller data, external systems,
+  and executable actions.
 
 task_levels:
   L0:
@@ -19,7 +20,7 @@ task_levels:
     model: gpt-5.6-terra
     alias: Luna
     use_for:
-      - focused implementation with an accepted specification
+      - isolated implementation under an accepted Sol task specification
       - isolated test additions
       - local documentation edits
       - read-only repository inspection
@@ -41,7 +42,7 @@ task_levels:
     model: gpt-5.6-sol
     alias: Sol
     use_for:
-      - real seller data
+      - externally accessed or sensitive seller data (not local seller-provided form inputs)
       - external MCP/API access
       - account mutations
       - executable campaign actions
@@ -52,13 +53,13 @@ task_levels:
 delegation:
   coordinator: sol
   max_luna_subagents: 3
-  allowed_luna_work: independent read-only or isolated tasks
+  allowed_luna_work: independent read-only inspection or isolated implementation under a Sol task specification
   sol_owns:
     synthesis: sol
-    writes: sol
+    integration: sol
     final_review: sol
     external_actions: sol
-    final_approval: sol
+    user_approval: sol
   boundary: Sol may delegate at most three independent Luna sub-agents and must retain the final decision.
 
 reporting:
@@ -76,6 +77,6 @@ reporting:
 
 anti_patterns:
   - Do not use a model for L0 deterministic work.
-  - Do not use Luna for final review, real seller data, external access, account mutations, or executable actions.
+  - Do not use Luna for final review, externally accessed or sensitive seller data, external access, account mutations, or executable actions.
   - Do not let more than three Luna sub-agents work under one Sol coordinator.
   - Do not perform an external or executable action before explicit user approval.

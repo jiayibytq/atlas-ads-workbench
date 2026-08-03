@@ -44,6 +44,22 @@ Launch the local workbench for a seller to review inputs and generate a clearly 
 8. 将实际需要但当前未接入的信息标记为“等待外部验证”。只有未来接入授权适配器后，才能把外部来源资料记录为 `verified` 或 `external_evidence`。
 9. 最终生成演示报告时，继续显示模型调用、外部数据使用、规则版本和不可执行边界。
 
+### 更新 Skill
+
+当用户说“请帮我更新 Atlas Ads skill”“更新工作台 skill”或“拉取最新版”时，运行：
+
+```bash
+python3 scripts/update_skill.py --update
+```
+
+更新器会先检查来源、当前版本、目标版本和验证结果；不会覆盖未提交的本地修改，也不会在验证失败时切换版本。完成后报告旧版与新版提交、更新来源、验证结果和改动文件。**成功更新后请用户新开一个会话**，因为当前会话已经加载了旧版 `SKILL.md`。
+
+### 模型路由与权限
+
+遵循 `contracts/model-routing.yaml`：L0 的确定性计算、校验与测试不调用模型；简单且封闭的本地任务由 Luna（`gpt-5.6-terra`）完成；困难推理、跨模块判断和最终复核由 Sol（`gpt-5.6-sol`）负责。
+
+Sol 最多协调 3 个独立、只读或隔离的 Luna 子 Agent，并保留综合、写入和最终复核责任。真实卖家数据、外部 MCP/API、账户变更或可执行广告动作只能由 Sol 在获得用户当次明确批准后进行；在此之前只能准备方案或不可执行草案。
+
 ## Examples
 
 ### 为什么固定演示预算不是真实建议
@@ -73,3 +89,5 @@ Launch the local workbench for a seller to review inputs and generate a clearly 
 - `README.md` for the public data boundary and project status.
 - `docs/architecture/phase-1.md` for the storage and API contract.
 - `docs/architecture/decision-contract.md` for evidence, rule, and output boundaries.
+- `contracts/model-routing.yaml` for the machine-readable model and permission contract.
+- `docs/model-routing-policy.md` for routing examples and anti-patterns.

@@ -1,0 +1,81 @@
+version: 1
+purpose: >-
+  Route work to the least capable model that can complete it while preserving
+  a human approval boundary for real data, external systems, and executable actions.
+
+task_levels:
+  L0:
+    label: deterministic local work
+    model: none
+    use_for:
+      - schema validation
+      - budget arithmetic
+      - local file formatting
+      - test execution
+    boundary: Do not ask a model to make a judgment when a deterministic rule can decide it.
+
+  L1:
+    label: simple bounded task
+    model: gpt-5.6-terra
+    alias: Luna
+    use_for:
+      - focused implementation with an accepted specification
+      - isolated test additions
+      - local documentation edits
+      - read-only repository inspection
+    boundary: Luna does not make final product judgments, perform external actions, or approve its own high-impact output.
+
+  L2:
+    label: difficult reasoning or synthesis
+    model: gpt-5.6-sol
+    alias: Sol
+    use_for:
+      - ambiguous design decisions
+      - cross-module changes
+      - risk assessment
+      - final review
+    boundary: Sol owns the final synthesis and accepts responsibility for the resulting plan or decision.
+
+  L3:
+    label: controlled external or executable work
+    model: gpt-5.6-sol
+    alias: Sol
+    use_for:
+      - real seller data
+      - external MCP/API access
+      - account mutations
+      - executable campaign actions
+    requires_model: gpt-5.6-sol
+    requires_user_approval: true
+    boundary: Explicit user approval is required immediately before the external or executable action.
+
+delegation:
+  coordinator: sol
+  max_luna_subagents: 3
+  allowed_luna_work: independent read-only or isolated tasks
+  sol_owns:
+    synthesis: sol
+    writes: sol
+    final_review: sol
+    external_actions: sol
+    final_approval: sol
+  boundary: Sol may delegate at most three independent Luna sub-agents and must retain the final decision.
+
+reporting:
+  required_fields:
+    - task_level
+    - model
+    - source_evidence
+    - version
+  update_runs_must_include:
+    - current_commit
+    - target_commit
+    - source
+    - validation
+    - changed
+
+anti_patterns:
+  - Do not use a model for L0 deterministic work.
+  - Do not use Luna for final review, real seller data, external access, account mutations, or executable actions.
+  - Do not let more than three Luna sub-agents work under one Sol coordinator.
+  - Do not perform an external or executable action before explicit user approval.

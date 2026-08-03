@@ -1,7 +1,9 @@
 import importlib.util
 import json
 from pathlib import Path
+from shutil import copy2
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -18,6 +20,15 @@ def run_git(directory, *arguments):
         text=True,
         capture_output=True,
     ).stdout.strip()
+
+
+def git_result(directory, *arguments):
+    return subprocess.run(
+        ["git", *arguments],
+        cwd=directory,
+        text=True,
+        capture_output=True,
+    )
 
 
 def write_text(path, content):
@@ -50,6 +61,8 @@ class SkillUpdaterTests(unittest.TestCase):
         }))
         write_text(self.publisher / "tests" / "test_smoke.py", "import unittest\n\nclass SmokeTests(unittest.TestCase):\n    def test_smoke(self):\n        self.assertTrue(True)\n")
         write_text(self.publisher / "version.txt", "one\n")
+        (self.publisher / "scripts").mkdir()
+        copy2(UPDATER, self.publisher / "scripts" / "update_skill.py")
         self._commit_and_push(self.publisher, "initial skill")
         run_git(self.root, "clone", str(self.remote), str(self.checkout))
         self._configure_author(self.checkout)
@@ -89,13 +102,40 @@ class SkillUpdaterTests(unittest.TestCase):
         updater = load_updater()
         original_head = run_git(self.checkout, "rev-parse", "HEAD")
         target_head = self._publish_update()
+        fetch_head_before = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
 
         result = updater.run_update(self.checkout, mode="check")
+        fetch_head_after = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
 
         self.assertEqual(result["status"], "update_available")
         self.assertEqual(result["target_commit"], target_head)
         self.assertEqual(result["validation"]["status"], "not_run")
         self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(fetch_head_after.returncode, fetch_head_before.returncode)
+        self.assertEqual(fetch_head_after.stdout, fetch_head_before.stdout)
+
+    def test_cli_check_and_update_return_json_evidence(self):
+        target_head = self._publish_update()
+        command = [sys.executable, self.checkout / "scripts" / "update_skill.py"]
+
+        checked = subprocess.run(
+            [*command, "--check", "--json"], text=True, capture_output=True
+        )
+
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        check_result = json.loads(checked.stdout)
+        self.assertEqual(check_result["status"], "update_available")
+        self.assertEqual(check_result["target_commit"], target_head)
+
+        updated = subprocess.run(
+            [*command, "--update", "--json"], text=True, capture_output=True
+        )
+
+        self.assertEqual(updated.returncode, 0, updated.stderr)
+        update_result = json.loads(updated.stdout)
+        self.assertEqual(update_result["status"], "updated")
+        self.assertEqual(update_result["target_commit"], target_head)
+        self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), target_head)
 
     def test_dirty_checkout_is_refused_without_changing_head(self):
         updater = load_updater()
@@ -160,6 +200,48 @@ class SkillUpdaterTests(unittest.TestCase):
         self.assertEqual(result["target_commit"], target_head)
         self.assertEqual(result["validation"]["status"], "failed")
         self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+
+    def test_detached_checkout_is_refused_before_fetch_or_merge(self):
+        updater = load_updater()
+        original_head = run_git(self.checkout, "rev-parse", "HEAD")
+        self._publish_update()
+        fetch_head_before = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
+        run_git(self.checkout, "checkout", "--detach")
+
+        result = updater.run_update(self.checkout, mode="update")
+        fetch_head_after = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
+
+        self.assertEqual(result["status"], "refused_detached")
+        self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(fetch_head_after.returncode, fetch_head_before.returncode)
+        self.assertEqual(fetch_head_after.stdout, fetch_head_before.stdout)
+
+    def test_symlink_and_linked_worktree_resolve_to_their_own_checkout(self):
+        updater = load_updater()
+        target_head = self._publish_update()
+        symlink = self.root / "atlas-skill-link"
+        symlink.symlink_to(self.checkout, target_is_directory=True)
+
+        checked = updater.run_update(symlink, mode="check")
+
+        self.assertEqual(checked["status"], "update_available")
+        self.assertEqual(checked["target_commit"], target_head)
+
+        linked_worktree = self.root / "linked-worktree"
+        run_git(
+            self.checkout,
+            "worktree",
+            "add",
+            "-b",
+            "linked-skill-update",
+            str(linked_worktree),
+            "HEAD",
+        )
+
+        updated = updater.run_update(linked_worktree, mode="update")
+
+        self.assertEqual(updated["status"], "updated")
+        self.assertEqual(run_git(linked_worktree, "rev-parse", "HEAD"), target_head)
 
 
 if __name__ == "__main__":

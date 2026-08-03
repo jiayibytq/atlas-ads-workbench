@@ -36,7 +36,10 @@ def empty_result():
 
 
 def discover_repository(path):
-    return Path(git_output(path, "rev-parse", "--show-toplevel"))
+    candidate = Path(path)
+    if candidate.is_file():
+        candidate = candidate.parent
+    return Path(git_output(candidate, "rev-parse", "--show-toplevel"))
 
 
 def load_source(repository):
@@ -44,6 +47,8 @@ def load_source(repository):
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(metadata, dict):
         return None
 
     remote = metadata.get("remote")
@@ -62,6 +67,31 @@ def load_source(repository):
         "repository": metadata.get("repository"),
         "channel": metadata.get("channel", "stable"),
     }
+
+
+def resolve_target(repository, source, mode):
+    """Return the candidate commit without fetching during a check-only run."""
+    if mode == "check":
+        remote_ref = "refs/heads/%s" % source["ref"]
+        listed = git(
+            repository,
+            "ls-remote",
+            "--exit-code",
+            "--heads",
+            source["remote"],
+            remote_ref,
+            check=False,
+        )
+        if listed.returncode:
+            return None
+        line = next((line for line in listed.stdout.splitlines() if "\t" in line), None)
+        return line.split("\t", 1)[0] if line else None
+
+    fetched = git(repository, "fetch", "--no-tags", source["remote"], source["ref"], check=False)
+    if fetched.returncode:
+        return None
+    target = git(repository, "rev-parse", "FETCH_HEAD", check=False)
+    return target.stdout.strip() if not target.returncode else None
 
 
 def validation_command(repository):
@@ -106,60 +136,89 @@ def run_update(path, mode):
         result["status"] = "refused_source"
         return result
 
-    if git(repository, "status", "--porcelain", "--untracked-files=all").stdout.strip():
-        result["status"] = "refused_dirty"
-        return result
+    try:
+        status = git(repository, "status", "--porcelain", "--untracked-files=all", check=False)
+        if status.returncode:
+            result["status"] = "refused_unknown"
+            return result
+        if status.stdout.strip():
+            result["status"] = "refused_dirty"
+            return result
 
-    source = load_source(repository)
-    if source is None:
-        result["status"] = "refused_source"
-        return result
-    result["source"] = source
+        source = load_source(repository)
+        if source is None:
+            result["status"] = "refused_source"
+            return result
+        result["source"] = source
 
-    fetched = git(repository, "fetch", "--no-tags", source["remote"], source["ref"], check=False)
-    if fetched.returncode:
-        result["status"] = "refused_source"
-        return result
-    target = git(repository, "rev-parse", "FETCH_HEAD", check=False)
-    if target.returncode:
-        result["status"] = "refused_source"
-        return result
-    result["target_commit"] = target.stdout.strip()
+        attached = git(repository, "symbolic-ref", "--quiet", "HEAD", check=False)
+        if attached.returncode:
+            result["status"] = "refused_detached"
+            return result
 
-    if result["target_commit"] == result["current_commit"]:
-        result["status"] = "up_to_date"
-        return result
+        result["target_commit"] = resolve_target(repository, source, mode)
+        if not result["target_commit"]:
+            result["status"] = "refused_source"
+            return result
 
-    is_ancestor = git(
-        repository,
-        "merge-base",
-        "--is-ancestor",
-        result["current_commit"],
-        result["target_commit"],
-        check=False,
-    )
-    if is_ancestor.returncode:
-        result["status"] = "refused_diverged"
-        return result
-    result["changed"] = git_output(
-        repository, "diff", "--name-only", result["current_commit"], result["target_commit"]
-    ).splitlines()
+        if result["target_commit"] == result["current_commit"]:
+            result["status"] = "up_to_date"
+            return result
 
-    if mode == "check":
-        result["status"] = "update_available"
-        return result
+        if mode == "check":
+            result["status"] = "update_available"
+            return result
 
-    result["validation"] = validate_target(repository, result["target_commit"])
-    if result["validation"]["status"] != "passed":
-        result["status"] = "validation_failed"
-        return result
+        is_ancestor = git(
+            repository,
+            "merge-base",
+            "--is-ancestor",
+            result["current_commit"],
+            result["target_commit"],
+            check=False,
+        )
+        if is_ancestor.returncode:
+            result["status"] = "refused_diverged"
+            return result
+        changed = git(
+            repository,
+            "diff",
+            "--name-only",
+            result["current_commit"],
+            result["target_commit"],
+            check=False,
+        )
+        if changed.returncode:
+            result["status"] = "refused_unknown"
+            return result
+        result["changed"] = changed.stdout.splitlines()
 
-    merged = git(repository, "merge", "--ff-only", result["target_commit"], check=False)
-    if merged.returncode:
-        result["status"] = "refused_diverged"
+        result["validation"] = validate_target(repository, result["target_commit"])
+        if result["validation"]["status"] != "passed":
+            result["status"] = "validation_failed"
+            return result
+
+        current_after_validation = git(repository, "rev-parse", "HEAD", check=False)
+        active_status = git(repository, "status", "--porcelain", "--untracked-files=all", check=False)
+        if current_after_validation.returncode or active_status.returncode:
+            result["status"] = "refused_unknown"
+            return result
+        if current_after_validation.stdout.strip() != result["current_commit"]:
+            result["status"] = "refused_diverged"
+            return result
+        if active_status.stdout.strip():
+            result["status"] = "refused_dirty"
+            return result
+
+        merged = git(repository, "merge", "--ff-only", result["target_commit"], check=False)
+        if merged.returncode:
+            result["status"] = "refused_diverged"
+            return result
+        result["status"] = "updated"
         return result
-    result["status"] = "updated"
-    return result
+    except (OSError, subprocess.SubprocessError, ValueError):
+        result["status"] = "refused_unknown"
+        return result
 
 
 def format_result(result):
@@ -184,7 +243,7 @@ def main():
     parser.add_argument("--json", action="store_true", help="Print machine-readable update evidence.")
     arguments = parser.parse_args()
 
-    result = run_update(Path(__file__).resolve(), "check" if arguments.check else "update")
+    result = run_update(Path(__file__).resolve().parent, "check" if arguments.check else "update")
     print(json.dumps(result, ensure_ascii=False, sort_keys=True) if arguments.json else format_result(result))
     return 0 if result["status"] in {"up_to_date", "update_available", "updated"} else 1
 

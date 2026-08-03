@@ -102,17 +102,30 @@ class SkillUpdaterTests(unittest.TestCase):
         updater = load_updater()
         original_head = run_git(self.checkout, "rev-parse", "HEAD")
         target_head = self._publish_update()
-        fetch_head_before = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
+        metadata_before = self._git_metadata_snapshot()
 
         result = updater.run_update(self.checkout, mode="check")
-        fetch_head_after = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
 
         self.assertEqual(result["status"], "update_available")
         self.assertEqual(result["target_commit"], target_head)
         self.assertEqual(result["validation"]["status"], "not_run")
         self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
-        self.assertEqual(fetch_head_after.returncode, fetch_head_before.returncode)
-        self.assertEqual(fetch_head_after.stdout, fetch_head_before.stdout)
+        self.assertEqual(self._git_metadata_snapshot(), metadata_before)
+
+    def test_check_refuses_diverged_history_without_writing_checkout_metadata(self):
+        updater = load_updater()
+        write_text(self.checkout / "local-only.txt", "local\n")
+        run_git(self.checkout, "add", "local-only.txt")
+        run_git(self.checkout, "commit", "-m", "local change")
+        original_head = run_git(self.checkout, "rev-parse", "HEAD")
+        self._publish_update()
+        metadata_before = self._git_metadata_snapshot()
+
+        result = updater.run_update(self.checkout, mode="check")
+
+        self.assertEqual(result["status"], "refused_diverged")
+        self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(self._git_metadata_snapshot(), metadata_before)
 
     def test_cli_check_and_update_return_json_evidence(self):
         target_head = self._publish_update()
@@ -219,6 +232,57 @@ class SkillUpdaterTests(unittest.TestCase):
 
         self.assertEqual(normalized, {"github.com/jiayibytq/atlas-ads-workbench"})
 
+    def test_credential_bearing_source_is_refused_and_never_leaks_in_result(self):
+        updater = load_updater()
+        secret = "top-secret-token"
+        write_text(self.checkout / "skill-source.json", json.dumps({
+            "repository": "https://%s@github.com/jiayibytq/atlas-ads-workbench.git" % secret,
+            "remote": "origin",
+            "ref": "main",
+        }))
+        run_git(
+            self.checkout,
+            "remote",
+            "set-url",
+            "origin",
+            "https://%s@github.com/jiayibytq/atlas-ads-workbench.git" % secret,
+        )
+
+        result = updater.run_update(self.checkout, mode="check")
+        json_result = json.dumps(result)
+
+        self.assertEqual(result["status"], "refused_source")
+        self.assertNotIn(secret, json_result)
+        self.assertNotIn(secret, updater.format_result(result))
+
+    def test_rejects_insecure_or_ambiguous_network_source_urls(self):
+        updater = load_updater()
+        unsafe = (
+            "http://github.com/jiayibytq/atlas-ads-workbench.git",
+            "git://github.com/jiayibytq/atlas-ads-workbench.git",
+            "https://github.com:8443/jiayibytq/atlas-ads-workbench.git",
+            "https://github.com/jiayibytq/atlas-ads-workbench.git?token=nope",
+            "ssh://git@github.com:2200/jiayibytq/atlas-ads-workbench.git",
+            "https://user:password@github.com/jiayibytq/atlas-ads-workbench.git",
+        )
+
+        for source_url in unsafe:
+            with self.subTest(source_url=source_url):
+                self.assertIsNone(updater.normalize_repository_url(source_url, self.checkout))
+
+    def test_safe_source_output_uses_canonical_host_and_path(self):
+        updater = load_updater()
+        for source_url in (
+            "https://github.com/jiayibytq/atlas-ads-workbench.git",
+            "git@github.com:jiayibytq/atlas-ads-workbench.git",
+            "ssh://git@github.com/jiayibytq/atlas-ads-workbench.git",
+        ):
+            with self.subTest(source_url=source_url):
+                self.assertEqual(
+                    updater.normalize_repository_url(source_url, self.checkout),
+                    "github.com/jiayibytq/atlas-ads-workbench",
+                )
+
     def test_validation_failure_preserves_active_head(self):
         updater = load_updater()
         original_head = run_git(self.checkout, "rev-parse", "HEAD")
@@ -275,6 +339,30 @@ class SkillUpdaterTests(unittest.TestCase):
 
         self.assertEqual(updated["status"], "updated")
         self.assertEqual(run_git(linked_worktree, "rev-parse", "HEAD"), target_head)
+
+    def _git_metadata_snapshot(self):
+        git_directory = Path(run_git(self.checkout, "rev-parse", "--git-dir"))
+        if not git_directory.is_absolute():
+            git_directory = self.checkout / git_directory
+        paths = (
+            "HEAD",
+            "FETCH_HEAD",
+            "index",
+            "refs",
+            "packed-refs",
+        )
+        snapshot = {}
+        for relative_path in paths:
+            item = git_directory / relative_path
+            if item.is_dir():
+                snapshot[relative_path] = sorted(
+                    (path.relative_to(git_directory).as_posix(), path.read_bytes())
+                    for path in item.rglob("*")
+                    if path.is_file()
+                )
+            else:
+                snapshot[relative_path] = item.read_bytes() if item.exists() else None
+        return snapshot
 
 
 if __name__ == "__main__":

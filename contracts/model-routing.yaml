@@ -63,7 +63,7 @@ delegation:
   boundary: Sol may delegate at most three independent Luna sub-agents and must retain the final decision.
 
 reporting:
-  required_fields:
+  agent_wrapper_required_fields:
     - task_level
     - model
     - source_evidence
@@ -74,6 +74,7 @@ reporting:
     - source
     - validation
     - changed
+  boundary: task_level, model, source_evidence, and version are Agent 包装层证据; the updater JSON keeps its stable update-run fields and does not require model-routing fields.
 
 anti_patterns:
   - Do not use a model for L0 deterministic work.

@@ -24,7 +24,7 @@ workflow_selection:
 
 gates:
   - id: FEASIBILITY-GATE-001
-    version: 1
+    version: 2
     purpose: Calculate the visible total-budget feasibility boundary.
     required_inputs:
       - monthly_sales_target
@@ -55,27 +55,29 @@ gates:
     if_incomplete: Return missing evidence and collection action; do not recommend SB.
 
   - id: SD-GATE-001
-    version: 2
+    version: 3
     applies_when:
       selected_ad_modules_contains_any: [sd, sd_cross_sell]
-    purpose: Determine whether an SD and old-product cross-sell rule may be evaluated.
-    required_evidence:
-      - field: display_eligibility_status
-        accepted_statuses: [verified]
-      - field: campaign_goal
-        accepted_statuses: [confirmed]
-      - field: new_product_asin
-        accepted_statuses: [confirmed, verified, external_evidence]
-      - field: old_product_asins
-        accepted_statuses: [confirmed, verified, external_evidence]
-      - field: catalog_relationship
-        accepted_statuses: [confirmed]
-        accepted_values: [complementary, upgrade_path, compatible]
-      - field: inventory_health
-        accepted_statuses: [confirmed, verified, external_evidence]
-      - field: contribution_margin
-        accepted_statuses: [confirmed, external_evidence]
-    if_incomplete: Return missing evidence and collection action; do not recommend SD or old-product cross-sell.
+    purpose: Determine whether an SD rule may be evaluated, with extra evidence only for old-product cross-sell.
+    required_evidence_by_module:
+      sd:
+        - field: display_eligibility_status
+          accepted_statuses: [verified]
+        - field: campaign_goal
+          accepted_statuses: [confirmed]
+        - field: new_product_asin
+          accepted_statuses: [confirmed, verified, external_evidence]
+        - field: inventory_health
+          accepted_statuses: [confirmed, verified, external_evidence]
+      sd_cross_sell_additions:
+        - field: old_product_asins
+          accepted_statuses: [confirmed, verified, external_evidence]
+        - field: catalog_relationship
+          accepted_statuses: [confirmed]
+          accepted_values: [complementary, upgrade_path, compatible]
+        - field: contribution_margin
+          accepted_statuses: [confirmed, external_evidence]
+    if_incomplete: Return only the missing evidence and capability-specific collection action; do not recommend SD or old-product cross-sell.
 
   - id: CAMPAIGN-ARCHITECTURE-GATE-001
     version: 1

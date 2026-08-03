@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -10,19 +11,23 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlparse
 
 
-def git(repository, *arguments, check=True):
+def git(repository, *arguments, check=True, read_only=False):
     """Run Git without shell interpolation and return its completed process."""
+    environment = None
+    if read_only:
+        environment = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
     return subprocess.run(
         ["git", *arguments],
         cwd=repository,
         check=check,
         text=True,
         capture_output=True,
+        env=environment,
     )
 
 
-def git_output(repository, *arguments):
-    return git(repository, *arguments).stdout.strip()
+def git_output(repository, *arguments, read_only=False):
+    return git(repository, *arguments, read_only=read_only).stdout.strip()
 
 
 def empty_result():
@@ -36,24 +41,41 @@ def empty_result():
     }
 
 
-def discover_repository(path):
+def discover_repository(path, read_only=False):
     candidate = Path(path)
     if candidate.is_file():
         candidate = candidate.parent
-    return Path(git_output(candidate, "rev-parse", "--show-toplevel"))
+    return Path(git_output(candidate, "rev-parse", "--show-toplevel", read_only=read_only))
 
 
 def normalize_repository_url(value, repository):
-    """Return a comparable identity for local and common Git repository URLs."""
+    """Return a safe, comparable identity for approved Git repository URLs."""
     if not isinstance(value, str) or not value.strip():
         return None
     candidate = value.strip()
     parsed = urlparse(candidate)
 
     if parsed.scheme == "file":
+        if parsed.netloc not in {"", "localhost"} or parsed.query or parsed.fragment:
+            return None
         return "local:%s" % Path(parsed.path).resolve()
-    if parsed.scheme in {"git", "http", "https", "ssh"}:
+    if parsed.scheme in {"https", "ssh"}:
         if not parsed.hostname or not parsed.path:
+            return None
+        try:
+            port = parsed.port
+        except ValueError:
+            return None
+        if parsed.query or parsed.fragment or parsed.params:
+            return None
+        if parsed.scheme == "https":
+            if parsed.username is not None or parsed.password is not None or port not in {None, 443}:
+                return None
+        elif (
+            parsed.password is not None
+            or parsed.username not in {None, "git"}
+            or port not in {None, 22}
+        ):
             return None
         host = parsed.hostname.lower()
         path = parsed.path.strip("/")
@@ -63,9 +85,21 @@ def normalize_repository_url(value, repository):
             return None
         identity = "%s/%s" % (host, path)
         return identity.lower() if host == "github.com" else identity
+    if parsed.scheme:
+        return None
     if ":" in candidate and "/" not in candidate.split(":", 1)[0]:
         host_part, path = candidate.split(":", 1)
-        host = host_part.rsplit("@", 1)[-1].lower()
+        if "?" in candidate or "#" in candidate:
+            return None
+        if host_part.count("@") > 1:
+            return None
+        if "@" in host_part:
+            user, host = host_part.split("@", 1)
+            if user != "git":
+                return None
+        else:
+            host = host_part
+        host = host.lower()
         path = path.strip("/")
         if path.endswith(".git"):
             path = path[:-4]
@@ -79,7 +113,7 @@ def normalize_repository_url(value, repository):
     return "local:%s" % local_path.resolve()
 
 
-def load_source(repository):
+def load_source(repository, read_only=False):
     metadata_path = repository / "skill-source.json"
     try:
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -92,9 +126,11 @@ def load_source(repository):
     ref = metadata.get("ref")
     if not isinstance(remote, str) or not remote or not isinstance(ref, str) or not ref:
         return None
-    if git(repository, "check-ref-format", "--branch", ref, check=False).returncode:
+    if git(
+        repository, "check-ref-format", "--branch", ref, check=False, read_only=read_only
+    ).returncode:
         return None
-    remote_url = git(repository, "remote", "get-url", remote, check=False)
+    remote_url = git(repository, "remote", "get-url", remote, check=False, read_only=read_only)
     if remote_url.returncode:
         return None
     expected_identity = normalize_repository_url(metadata.get("repository"), repository)
@@ -104,8 +140,8 @@ def load_source(repository):
     return {
         "remote": remote,
         "ref": ref,
-        "url": remote_url.stdout.strip(),
-        "repository": metadata.get("repository"),
+        "url": remote_identity,
+        "repository": expected_identity,
         "identity": remote_identity,
         "channel": metadata.get("channel", "stable"),
     }
@@ -115,25 +151,103 @@ def resolve_target(repository, source, mode):
     """Return the candidate commit without fetching during a check-only run."""
     if mode == "check":
         remote_ref = "refs/heads/%s" % source["ref"]
-        listed = git(
-            repository,
-            "ls-remote",
-            "--exit-code",
-            "--heads",
-            source["remote"],
-            remote_ref,
-            check=False,
-        )
-        if listed.returncode:
-            return None
-        line = next((line for line in listed.stdout.splitlines() if "\t" in line), None)
-        return line.split("\t", 1)[0] if line else None
+        return inspect_target_read_only(repository, source, remote_ref)
 
     fetched = git(repository, "fetch", "--no-tags", source["remote"], source["ref"], check=False)
     if fetched.returncode:
         return None
     target = git(repository, "rev-parse", "FETCH_HEAD", check=False)
     return target.stdout.strip() if not target.returncode else None
+
+
+def inspect_target_read_only(repository, source, remote_ref):
+    """Fetch comparison objects only into a temporary repository for --check."""
+    with TemporaryDirectory(prefix="atlas-ads-update-check-") as temporary_directory:
+        object_store = Path(temporary_directory) / "comparison.git"
+        cloned = git(
+            repository,
+            "clone",
+            "--bare",
+            "--no-local",
+            str(repository),
+            str(object_store),
+            check=False,
+            read_only=True,
+        )
+        if cloned.returncode:
+            return None
+        remote_url = git(
+            repository,
+            "remote",
+            "get-url",
+            source["remote"],
+            check=False,
+            read_only=True,
+        )
+        if remote_url.returncode:
+            return None
+        fetched = git(
+            object_store,
+            "fetch",
+            "--no-tags",
+            remote_url.stdout.strip(),
+            remote_ref,
+            check=False,
+        )
+        if fetched.returncode:
+            return None
+        target = git(object_store, "rev-parse", "FETCH_HEAD", check=False)
+        return target.stdout.strip() if not target.returncode else None
+
+
+def target_fast_forwards_current_read_only(repository, source, current_commit, target_commit):
+    """Compare history in a temporary clone so --check never updates the checkout."""
+    with TemporaryDirectory(prefix="atlas-ads-update-ancestry-") as temporary_directory:
+        object_store = Path(temporary_directory) / "comparison.git"
+        cloned = git(
+            repository,
+            "clone",
+            "--bare",
+            "--no-local",
+            str(repository),
+            str(object_store),
+            check=False,
+            read_only=True,
+        )
+        if cloned.returncode:
+            return None
+        remote_url = git(
+            repository,
+            "remote",
+            "get-url",
+            source["remote"],
+            check=False,
+            read_only=True,
+        )
+        if remote_url.returncode:
+            return None
+        fetched = git(
+            object_store,
+            "fetch",
+            "--no-tags",
+            remote_url.stdout.strip(),
+            "refs/heads/%s" % source["ref"],
+            check=False,
+        )
+        if fetched.returncode:
+            return None
+        target_available = git(object_store, "cat-file", "-e", "%s^{commit}" % target_commit, check=False)
+        if target_available.returncode:
+            return None
+        relation = git(
+            object_store,
+            "merge-base",
+            "--is-ancestor",
+            current_commit,
+            target_commit,
+            check=False,
+        )
+        return relation.returncode == 0
 
 
 def validation_command(repository):
@@ -172,31 +286,41 @@ def run_update(path, mode):
     """Check or safely fast-forward the checkout containing *path*."""
     result = empty_result()
     try:
-        repository = discover_repository(path)
-        result["current_commit"] = git_output(repository, "rev-parse", "HEAD")
+        repository = discover_repository(path, read_only=(mode == "check"))
+        result["current_commit"] = git_output(
+            repository, "rev-parse", "HEAD", read_only=(mode == "check")
+        )
     except (OSError, subprocess.CalledProcessError):
         result["status"] = "refused_source"
         return result
 
     try:
-        status = git(repository, "status", "--porcelain", "--untracked-files=all", check=False)
-        if status.returncode:
-            result["status"] = "refused_unknown"
-            return result
-        if status.stdout.strip():
-            result["status"] = "refused_dirty"
-            return result
-
-        source = load_source(repository)
+        source = load_source(repository, read_only=(mode == "check"))
         if source is None:
             result["status"] = "refused_source"
             return result
         result["source"] = source
 
-        attached = git(repository, "symbolic-ref", "--quiet", "HEAD", check=False)
+        attached = git(
+            repository,
+            "symbolic-ref",
+            "--quiet",
+            "HEAD",
+            check=False,
+            read_only=(mode == "check"),
+        )
         if attached.returncode:
             result["status"] = "refused_detached"
             return result
+
+        if mode == "update":
+            status = git(repository, "status", "--porcelain", "--untracked-files=all", check=False)
+            if status.returncode:
+                result["status"] = "refused_unknown"
+                return result
+            if status.stdout.strip():
+                result["status"] = "refused_dirty"
+                return result
 
         result["target_commit"] = resolve_target(repository, source, mode)
         if not result["target_commit"]:
@@ -208,7 +332,13 @@ def run_update(path, mode):
             return result
 
         if mode == "check":
-            result["status"] = "update_available"
+            fast_forward = target_fast_forwards_current_read_only(
+                repository, source, result["current_commit"], result["target_commit"]
+            )
+            if fast_forward is None:
+                result["status"] = "refused_source"
+            else:
+                result["status"] = "update_available" if fast_forward else "refused_diverged"
             return result
 
         is_ancestor = git(

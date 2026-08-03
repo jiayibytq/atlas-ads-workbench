@@ -112,6 +112,21 @@ class PublicContractTests(unittest.TestCase):
         self.assertIn("仅用于证明 UI 流程", document)
         self.assertIn("不是市场证据，也不可直接执行", document)
 
+    def test_decision_contract_names_both_incomplete_evidence_statuses(self):
+        document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text(
+            "utf-8"
+        )
+
+        self.assertIn("information_required", document)
+        self.assertIn("verification_required", document)
+
+    def test_model_routing_evidence_is_not_required_in_updater_result(self):
+        routing = (ROOT / "contracts" / "model-routing.yaml").read_text("utf-8")
+        updater = (ROOT / "scripts" / "update_skill.py").read_text("utf-8")
+
+        self.assertIn("Agent 包装层证据", routing)
+        self.assertNotIn('"task_level"', updater)
+
     def test_public_docs_explain_skill_update_lifecycle(self):
         readme = (ROOT / "README.md").read_text("utf-8")
         contributing = (ROOT / "CONTRIBUTING.md").read_text("utf-8")

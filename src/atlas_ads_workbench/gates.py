@@ -4,6 +4,12 @@ from typing import Any, Dict, Mapping, Sequence
 
 
 VALID_EVIDENCE_STATUSES = {"confirmed", "verified", "external_evidence"}
+GATE_VERSIONS = {
+    "FEASIBILITY-GATE-001": 2,
+    "SB-GATE-001": 2,
+    "SD-GATE-001": 3,
+    "CAMPAIGN-ARCHITECTURE-GATE-001": 1,
+}
 
 SB_REQUIRED_EVIDENCE = [
     {"field": "advertiser_account_status", "accepted_statuses": ["verified"]},
@@ -16,9 +22,12 @@ SD_REQUIRED_EVIDENCE = [
     {"field": "display_eligibility_status", "accepted_statuses": ["verified"]},
     {"field": "campaign_goal", "accepted_statuses": ["confirmed"]},
     {"field": "new_product_asin", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
+    {"field": "inventory_health", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
+]
+
+SD_CROSS_SELL_REQUIRED_EVIDENCE = [
     {"field": "old_product_asins", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
     {"field": "catalog_relationship", "accepted_statuses": ["confirmed"], "accepted_values": ["complementary", "upgrade_path", "compatible"]},
-    {"field": "inventory_health", "accepted_statuses": list(VALID_EVIDENCE_STATUSES)},
     {"field": "contribution_margin", "accepted_statuses": ["confirmed", "external_evidence"]},
 ]
 
@@ -56,14 +65,34 @@ def _evidence_gate(
     missing_external = [
         rule["field"]
         for rule in required
-        if "verified" in rule.get("accepted_statuses", [])
+        if "confirmed" not in rule.get("accepted_statuses", [])
         and rule["field"] in missing_fields
+    ]
+    missing_seller_input = [
+        field for field in missing_fields if field not in missing_external
     ]
     status = "verification_required" if missing_external else "information_required"
     seller_status = "等待外部验证" if missing_external else "待补充资料"
+    if missing_external and missing_seller_input:
+        next_action = {
+            "type": "collect_seller_input_and_external_evidence",
+            "label": "Provide seller-confirmed inputs and authorized external evidence without guessing.",
+        }
+    elif missing_external:
+        next_action = {
+            "type": "collect_external_evidence",
+            "label": "Provide the missing authorized external evidence without guessing.",
+        }
+    elif missing_seller_input:
+        next_action = {
+            "type": "collect_seller_input",
+            "label": "Provide the missing seller-confirmed information without guessing.",
+        }
+    else:
+        next_action = {"type": "human_review", "label": "Proceed to the rule evaluation."}
     return {
         "gate_id": gate_id,
-        "version": 2,
+        "version": GATE_VERSIONS[gate_id],
         "applicable": True,
         "status": "ready_for_rule_evaluation" if not missing_fields else status,
         "seller_status": "资料已齐全" if not missing_fields else seller_status,
@@ -74,19 +103,18 @@ def _evidence_gate(
         ),
         "passed_fields": passed_fields,
         "missing_fields": missing_fields,
+        "missing_seller_input_fields": missing_seller_input,
+        "missing_external_verification_fields": missing_external,
         "stale_fields": [],
         "conflicting_fields": [],
-        "next_action": {
-            "type": "human_review" if not missing_fields else "collect_seller_input",
-            "label": "Proceed to the rule evaluation." if not missing_fields else "Provide the missing evidence without guessing.",
-        },
+        "next_action": next_action,
     }
 
 
 def _not_applicable_gate(gate_id: str) -> Dict[str, Any]:
     return {
         "gate_id": gate_id,
-        "version": 2,
+        "version": GATE_VERSIONS[gate_id],
         "applicable": False,
         "status": "not_applicable",
         "seller_status": "未选择",
@@ -110,7 +138,7 @@ def evaluate_gates(
     has_conflict = not feasibility["is_feasible_at_benchmark"]
     feasibility_gate = {
         "gate_id": "FEASIBILITY-GATE-001",
-        "version": 2,
+        "version": GATE_VERSIONS["FEASIBILITY-GATE-001"],
         "applicable": True,
         "status": "constraint_conflict" if has_conflict else "ready_for_rule_evaluation",
         "seller_status": "存在数值冲突" if has_conflict else "目标可行",
@@ -142,7 +170,12 @@ def evaluate_gates(
         else _not_applicable_gate("SB-GATE-001")
     )
     sd_gate = (
-        _evidence_gate("SD-GATE-001", SD_REQUIRED_EVIDENCE, context)
+        _evidence_gate(
+            "SD-GATE-001",
+            SD_REQUIRED_EVIDENCE
+            + (SD_CROSS_SELL_REQUIRED_EVIDENCE if "sd_cross_sell" in selected else []),
+            context,
+        )
         if selected.intersection({"sd", "sd_cross_sell"})
         else _not_applicable_gate("SD-GATE-001")
     )

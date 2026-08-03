@@ -116,16 +116,19 @@ class PublicContractTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text("utf-8")
         contributing = (ROOT / "CONTRIBUTING.md").read_text("utf-8")
 
-        for expected_text in (
-            "Git checkout",
-            "请帮我更新 Atlas Ads skill",
-            "python3 scripts/update_skill.py --check",
-            "python3 scripts/update_skill.py --update",
-            "未提交的本地修改",
-            "旧版本",
-            "新开一个会话",
-        ):
-            self.assertIn(expected_text, readme)
+        self.assertIn("Git checkout", readme)
+        self.assertIn("请帮我更新 Atlas Ads skill", readme)
+        self.assertIn("python3 scripts/update_skill.py --check", readme)
+        self.assertIn("python3 scripts/update_skill.py --update", readme)
+        self.assertIn("未提交的本地修改", readme)
+        self.assertIn("current_commit", readme)
+        self.assertIn("target_commit", readme)
+        self.assertIn("source", readme)
+        self.assertIn("validation", readme)
+        self.assertIn("changed", readme)
+        self.assertIn("失败的更新会保留旧版本", readme)
+        self.assertIn("新开一个会话", readme)
+        self.assertIn("不进行后台自动更新", readme)
 
         for expected_text in (
             "验证",

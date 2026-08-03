@@ -186,6 +186,39 @@ class SkillUpdaterTests(unittest.TestCase):
         self.assertEqual(missing_ref["status"], "refused_source")
         self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), invalid_source_head)
 
+    def test_repository_identity_mismatch_is_refused_before_fetch_or_merge(self):
+        updater = load_updater()
+        original_head = run_git(self.checkout, "rev-parse", "HEAD")
+        self._publish_update()
+        untrusted_remote = self.root / "untrusted.git"
+        run_git(self.root, "init", "--bare", str(untrusted_remote))
+        fetch_head_before = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
+        run_git(self.checkout, "remote", "set-url", "origin", str(untrusted_remote))
+
+        result = updater.run_update(self.checkout, mode="update")
+        fetch_head_after = git_result(self.checkout, "rev-parse", "--verify", "FETCH_HEAD")
+
+        self.assertEqual(result["status"], "refused_source")
+        self.assertIsNone(result["target_commit"])
+        self.assertEqual(run_git(self.checkout, "rev-parse", "HEAD"), original_head)
+        self.assertEqual(fetch_head_after.returncode, fetch_head_before.returncode)
+        self.assertEqual(fetch_head_after.stdout, fetch_head_before.stdout)
+
+    def test_normalizes_common_github_repository_url_forms(self):
+        updater = load_updater()
+        variants = (
+            "https://github.com/jiayibytq/atlas-ads-workbench.git",
+            "https://github.com/jiayibytq/atlas-ads-workbench",
+            "git@github.com:jiayibytq/atlas-ads-workbench.git",
+            "ssh://git@github.com/jiayibytq/atlas-ads-workbench.git",
+        )
+
+        normalized = {
+            updater.normalize_repository_url(value, self.checkout) for value in variants
+        }
+
+        self.assertEqual(normalized, {"github.com/jiayibytq/atlas-ads-workbench"})
+
     def test_validation_failure_preserves_active_head(self):
         updater = load_updater()
         original_head = run_git(self.checkout, "rev-parse", "HEAD")

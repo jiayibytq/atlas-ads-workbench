@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from urllib.parse import urlparse
 
 
 def git(repository, *arguments, check=True):
@@ -42,6 +43,42 @@ def discover_repository(path):
     return Path(git_output(candidate, "rev-parse", "--show-toplevel"))
 
 
+def normalize_repository_url(value, repository):
+    """Return a comparable identity for local and common Git repository URLs."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = value.strip()
+    parsed = urlparse(candidate)
+
+    if parsed.scheme == "file":
+        return "local:%s" % Path(parsed.path).resolve()
+    if parsed.scheme in {"git", "http", "https", "ssh"}:
+        if not parsed.hostname or not parsed.path:
+            return None
+        host = parsed.hostname.lower()
+        path = parsed.path.strip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+        if not path:
+            return None
+        identity = "%s/%s" % (host, path)
+        return identity.lower() if host == "github.com" else identity
+    if ":" in candidate and "/" not in candidate.split(":", 1)[0]:
+        host_part, path = candidate.split(":", 1)
+        host = host_part.rsplit("@", 1)[-1].lower()
+        path = path.strip("/")
+        if path.endswith(".git"):
+            path = path[:-4]
+        if not host or not path:
+            return None
+        identity = "%s/%s" % (host, path)
+        return identity.lower() if host == "github.com" else identity
+    local_path = Path(candidate)
+    if not local_path.is_absolute():
+        local_path = Path(repository) / local_path
+    return "local:%s" % local_path.resolve()
+
+
 def load_source(repository):
     metadata_path = repository / "skill-source.json"
     try:
@@ -60,11 +97,16 @@ def load_source(repository):
     remote_url = git(repository, "remote", "get-url", remote, check=False)
     if remote_url.returncode:
         return None
+    expected_identity = normalize_repository_url(metadata.get("repository"), repository)
+    remote_identity = normalize_repository_url(remote_url.stdout.strip(), repository)
+    if expected_identity is None or remote_identity is None or expected_identity != remote_identity:
+        return None
     return {
         "remote": remote,
         "ref": ref,
         "url": remote_url.stdout.strip(),
         "repository": metadata.get("repository"),
+        "identity": remote_identity,
         "channel": metadata.get("channel", "stable"),
     }
 

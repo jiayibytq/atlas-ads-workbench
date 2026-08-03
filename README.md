@@ -39,11 +39,12 @@ python3 scripts/update_skill.py --check
 python3 scripts/update_skill.py --update
 ```
 
-更新结果会明确展示旧版本与目标版本的 commit、更新来源、验证状态和将要（或已经）变更的文件。更新器只接受配置来源上的快进更新，并会在隔离的候选版本中运行验证。
+更新结果会明确展示：`current_commit`（旧版本）、`target_commit`（目标版本）、`source`（更新来源）、`validation`（验证状态）和 `changed`（将要或已经变更的文件）。更新器会把 `skill-source.json` 的仓库标识与实际 Git remote URL 规范化比对，只接受配置来源上的快进更新，并会在隔离的候选版本中运行验证。
 
 - 若本地存在**未提交的本地修改**、来源 metadata 不完整、当前 checkout 处于 detached HEAD，或历史已经分叉，更新会停止，不覆盖现有文件。
-- 若候选版本验证失败、网络或 Git 来源不可用，工作台会保留**旧版本**；不要把失败的检查当作已更新。
+- 若候选版本验证失败、网络或 Git 来源不可用，**失败的更新会保留旧版本**；不要把失败的检查当作已更新。
 - 更新成功后，请**新开一个会话**再调用 skill。当前聊天已经加载了旧版 `SKILL.md`，不会在会话中途自动替换指令。
+- 此机制只在用户主动请求检查或更新时运行，**不进行后台自动更新**。
 
 发布者应先在自己的 checkout 验证更改，再将 commit 推送至 `skill-source.json` 配置的 remote/branch；需要可识别版本时，可在已验证的 commit 上创建并推送 Git tag。用户更新的依据始终是其本地 `skill-source.json` 记录的分支，而不是对某个仓库地址的猜测。
 

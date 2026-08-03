@@ -23,6 +23,30 @@
 
 运行时数据将保存在用户本机的 `.atlas-ads-workbench/` 数据目录，不应提交到 Git。项目不会保存 API Key、Cookie、卖家账号或 Amazon session。
 
+## 安装与手动更新 Skill
+
+Atlas Ads skill 必须以 **Git checkout** 安装，而不是复制单个 `SKILL.md` 或下载 ZIP。安装目录中的 `.git/` 让更新器能够确认当前版本和安全地快进更新；`skill-source.json` 则记录受信任的 Git remote、跟踪分支、仓库标识和更新渠道。
+
+```bash
+git clone https://github.com/jiayibytq/atlas-ads-workbench.git
+cd atlas-ads-workbench
+python3 scripts/update_skill.py --check
+```
+
+日常使用时，用户只需在聊天框中说：**“请帮我更新 Atlas Ads skill”**。Agent 会在该 Git checkout 中先执行检查，再在需要时执行：
+
+```bash
+python3 scripts/update_skill.py --update
+```
+
+更新结果会明确展示旧版本与目标版本的 commit、更新来源、验证状态和将要（或已经）变更的文件。更新器只接受配置来源上的快进更新，并会在隔离的候选版本中运行验证。
+
+- 若本地存在**未提交的本地修改**、来源 metadata 不完整、当前 checkout 处于 detached HEAD，或历史已经分叉，更新会停止，不覆盖现有文件。
+- 若候选版本验证失败、网络或 Git 来源不可用，工作台会保留**旧版本**；不要把失败的检查当作已更新。
+- 更新成功后，请**新开一个会话**再调用 skill。当前聊天已经加载了旧版 `SKILL.md`，不会在会话中途自动替换指令。
+
+发布者应先在自己的 checkout 验证更改，再将 commit 推送至 `skill-source.json` 配置的 remote/branch；需要可识别版本时，可在已验证的 commit 上创建并推送 Git tag。用户更新的依据始终是其本地 `skill-source.json` 记录的分支，而不是对某个仓库地址的猜测。
+
 ## 演示报告 Happy Path
 
 卖家填写基础资料后，可以点击“生成演示报告”，在页面查看三行 SP 广告搭建表。报告展示广告目的、预算占比、日预算、固定演示关键词或 ASIN，以及投放类型。

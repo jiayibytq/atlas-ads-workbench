@@ -112,6 +112,29 @@ class PublicContractTests(unittest.TestCase):
         self.assertIn("仅用于证明 UI 流程", document)
         self.assertIn("不是市场证据，也不可直接执行", document)
 
+    def test_public_docs_explain_skill_update_lifecycle(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        contributing = (ROOT / "CONTRIBUTING.md").read_text("utf-8")
+
+        for expected_text in (
+            "Git checkout",
+            "请帮我更新 Atlas Ads skill",
+            "python3 scripts/update_skill.py --check",
+            "python3 scripts/update_skill.py --update",
+            "未提交的本地修改",
+            "旧版本",
+            "新开一个会话",
+        ):
+            self.assertIn(expected_text, readme)
+
+        for expected_text in (
+            "验证",
+            "push",
+            "main",
+            "skill-source.json",
+        ):
+            self.assertIn(expected_text, contributing)
+
 
 if __name__ == "__main__":
     unittest.main()

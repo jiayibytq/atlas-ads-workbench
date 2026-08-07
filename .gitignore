@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.worktrees/
 
 # Local-only seller data and credentials
 .atlas-ads-workbench/

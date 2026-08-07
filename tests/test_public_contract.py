@@ -39,6 +39,21 @@ class PublicContractTests(unittest.TestCase):
             ["decision_id", "status", "claim", "evidence", "rule", "assumptions", "next_action"],
         )
 
+    def test_decision_contract_v2_names_progressive_workflow_statuses(self):
+        rules = (ROOT / "contracts" / "decision-rules.yaml").read_text("utf-8")
+        schema = json.loads((ROOT / "contracts" / "output-schema.json").read_text("utf-8"))
+
+        self.assertIn("contract_version: 2", rules)
+        self.assertIn("selected_ad_modules", rules)
+        self.assertIn("not_applicable", rules)
+        statuses = schema["$defs"]["decision"]["properties"]["status"]["enum"]
+        for status in (
+            "not_applicable",
+            "verification_required",
+            "constraint_conflict",
+        ):
+            self.assertIn(status, statuses)
+
     def test_decision_contract_document_explains_that_rules_are_not_data_connections(self):
         document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text("utf-8")
 
@@ -49,6 +64,94 @@ class PublicContractTests(unittest.TestCase):
             "不生成策略结论",
         ):
             self.assertIn(expected_text, document)
+
+    def test_public_docs_explain_the_demo_report_boundary(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        skill = (ROOT / "SKILL.md").read_text("utf-8")
+
+        for expected_text in (
+            "生成演示报告",
+            "30% / 45% / 25%",
+            "固定演示数据",
+            "不可直接执行",
+            "模型调用：0",
+        ):
+            self.assertIn(expected_text, readme)
+            self.assertIn(expected_text, skill)
+
+    def test_readme_describes_the_current_demo_budget_flow(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+
+        for expected_text in (
+            "当前演示闭环",
+            "确定性公式",
+            "30% / 45% / 25%",
+        ):
+            self.assertIn(expected_text, readme)
+
+    def test_public_docs_explain_the_progressive_seller_workflow(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        skill = (ROOT / "SKILL.md").read_text("utf-8")
+        decision_contract = (
+            ROOT / "docs" / "architecture" / "decision-contract.md"
+        ).read_text("utf-8")
+
+        workflow = "基础输入 → 预算与可行性 → 选择广告目标 → 补充证据 → 审核并生成"
+        self.assertIn(workflow, readme)
+        self.assertIn(workflow, skill)
+        self.assertIn("未选择的广告类型不执行 Gate", decision_contract)
+        self.assertIn("卖家已填写不等于外部已验证", decision_contract)
+
+    def test_decision_contract_scopes_campaign_prohibitions_to_strategy_advice(self):
+        document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text(
+            "utf-8"
+        )
+
+        self.assertIn("真实或策略 Campaign 建议", document)
+        self.assertIn("固定演示分配", document)
+        self.assertIn("仅用于证明 UI 流程", document)
+        self.assertIn("不是市场证据，也不可直接执行", document)
+
+    def test_decision_contract_names_both_incomplete_evidence_statuses(self):
+        document = (ROOT / "docs" / "architecture" / "decision-contract.md").read_text(
+            "utf-8"
+        )
+
+        self.assertIn("information_required", document)
+        self.assertIn("verification_required", document)
+
+    def test_model_routing_evidence_is_not_required_in_updater_result(self):
+        routing = (ROOT / "contracts" / "model-routing.yaml").read_text("utf-8")
+        updater = (ROOT / "scripts" / "update_skill.py").read_text("utf-8")
+
+        self.assertIn("Agent 包装层证据", routing)
+        self.assertNotIn('"task_level"', updater)
+
+    def test_public_docs_explain_skill_update_lifecycle(self):
+        readme = (ROOT / "README.md").read_text("utf-8")
+        contributing = (ROOT / "CONTRIBUTING.md").read_text("utf-8")
+
+        self.assertIn("Git checkout", readme)
+        self.assertIn("请帮我更新 Atlas Ads skill", readme)
+        self.assertIn("python3 scripts/update_skill.py --check", readme)
+        self.assertIn("python3 scripts/update_skill.py --update", readme)
+        self.assertIn("未提交的本地修改", readme)
+        self.assertIn("current_commit", readme)
+        self.assertIn("target_commit", readme)
+        self.assertIn("source", readme)
+        self.assertIn("validation", readme)
+        self.assertIn("changed", readme)
+        self.assertIn("失败的更新会保留旧版本", readme)
+        self.assertIn("新开一个会话", readme)
+        self.assertIn("不进行后台自动更新", readme)
+
+        for expected_text in (
+            "验证",
+            "push",
+            "main",
+            "skill-source.json",
+        ):
+            self.assertIn(expected_text, contributing)
 
 
 if __name__ == "__main__":

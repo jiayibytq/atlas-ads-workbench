@@ -73,7 +73,7 @@ class LocalServerTests(unittest.TestCase):
 
         self.assertEqual(response.status, 200)
         self.assertIn("Atlas Ads", page)
-        self.assertIn("第一阶段：仅保存需求", page)
+        self.assertIn("演示闭环", page)
 
     def test_api_rejects_missing_and_wrong_tokens(self):
         with self.assertRaises(HTTPError) as missing:
@@ -158,12 +158,65 @@ class LocalServerTests(unittest.TestCase):
 
     def test_authorized_client_can_evaluate_versioned_gates(self):
         status, gates = self.request(
-            "/api/gates", "POST", valid_payload(), token="test-token"
+            "/api/gates",
+            "POST",
+            {"intake": valid_payload(), "selected_ad_modules": ["sb"]},
+            token="test-token",
         )
 
         self.assertEqual(status, 200)
-        self.assertEqual(gates["SB-GATE-001"]["status"], "information_required")
+        self.assertEqual(gates["SB-GATE-001"]["status"], "verification_required")
         self.assertIn("brand_registry_status", gates["SB-GATE-001"]["missing_fields"])
+
+    def test_gates_only_evaluate_selected_modules(self):
+        status, gates = self.request(
+            "/api/gates",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sb"],
+                "evidence_context": {},
+            },
+            token="test-token",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(gates["SB-GATE-001"]["status"], "verification_required")
+        self.assertEqual(gates["SD-GATE-001"]["status"], "not_applicable")
+
+    def test_run_freezes_selected_modules(self):
+        status, manifest = self.request(
+            "/api/runs",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sp", "sd_cross_sell"],
+                "evidence_context": {},
+            },
+            token="test-token",
+        )
+        _, run = self.request("/api/runs/%s" % manifest["run_id"], token="test-token")
+
+        self.assertEqual(status, 201)
+        self.assertEqual(
+            run["decision_plan"]["selected_ad_modules"],
+            ["sp", "sd_cross_sell"],
+        )
+
+    def test_api_rejects_unknown_ad_module(self):
+        with self.assertRaises(HTTPError) as error:
+            self.request(
+                "/api/gates",
+                "POST",
+                {
+                    "intake": valid_payload(),
+                    "selected_ad_modules": ["unsupported"],
+                    "evidence_context": {},
+                },
+                token="test-token",
+            )
+
+        self.assertEqual(error.exception.code, 400)
 
     def test_gates_accept_a_source_neutral_evidence_envelope(self):
         status, gates = self.request(
@@ -171,6 +224,7 @@ class LocalServerTests(unittest.TestCase):
             "POST",
             {
                 "intake": valid_payload(),
+                "selected_ad_modules": ["sb"],
                 "evidence_context": {
                     "campaign_goal": {"value": "cross_sell", "status": "confirmed"}
                 }
@@ -180,6 +234,33 @@ class LocalServerTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertIn("campaign_goal", gates["SB-GATE-001"]["passed_fields"])
+
+    def test_standard_sd_accepts_its_own_evidence_without_cross_sell_fields(self):
+        status, gates = self.request(
+            "/api/gates",
+            "POST",
+            {
+                "intake": valid_payload(),
+                "selected_ad_modules": ["sd"],
+                "evidence_context": {
+                    "display_eligibility_status": {
+                        "value": "eligible",
+                        "status": "verified",
+                        "source": "amazon_ads_mcp",
+                    },
+                    "campaign_goal": {"value": "remarketing", "status": "confirmed"},
+                    "new_product_asin": {"value": "B0NEW123", "status": "confirmed"},
+                    "inventory_health": {"value": "healthy", "status": "confirmed"},
+                },
+            },
+            token="test-token",
+        )
+
+        gate = gates["SD-GATE-001"]
+        self.assertEqual(status, 200)
+        self.assertEqual(gate["status"], "ready_for_rule_evaluation")
+        self.assertNotIn("old_product_asins", gate["missing_fields"])
+        self.assertNotIn("contribution_margin", gate["missing_fields"])
 
     def test_run_freezes_normalized_evidence_context_with_the_decision(self):
         status, manifest = self.request(
@@ -201,6 +282,35 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(evidence["status"], "confirmed")
         self.assertEqual(evidence["source"], "seller_input")
         self.assertTrue(evidence["captured_at"])
+
+    def test_demo_report_endpoint_creates_and_returns_the_same_frozen_report(self):
+        status, response = self.request(
+            "/api/demo-report",
+            "POST",
+            {"intake": valid_payload(), "evidence_context": {}},
+            token="test-token",
+        )
+        run_id = response["run"]["run_id"]
+        _, saved = self.request("/api/runs/%s" % run_id, token="test-token")
+
+        self.assertEqual(status, 201)
+        self.assertEqual(response["report"]["report_type"], "demo")
+        self.assertFalse(response["report"]["is_executable"])
+        self.assertEqual(len(response["report"]["rows"]), 3)
+        self.assertEqual(
+            saved["decision_plan"]["demo_report"],
+            response["report"],
+        )
+        self.assertEqual(
+            saved["manifest"]["decision_plan_sha256"],
+            response["run"]["decision_plan_sha256"],
+        )
+
+    def test_demo_report_endpoint_requires_the_local_session_token(self):
+        with self.assertRaises(HTTPError) as error:
+            self.request("/api/demo-report", "POST", valid_payload())
+
+        self.assertEqual(error.exception.code, 401)
 
     def test_invalid_json_returns_a_structured_bad_request(self):
         request = Request(

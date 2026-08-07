@@ -10,11 +10,13 @@ from typing import Any, Dict
 from urllib.parse import urlsplit
 
 from .campaign_architecture import build_campaign_architecture
+from .demo_report import build_demo_report
 from .evidence import EvidenceValidationError, normalize_evidence_context
 from .feasibility import calculate_feasibility
 from .gates import evaluate_gates
 from .models import IntakeValidationError, validate_intake
 from .storage import LocalStorage, StorageError
+from .workflow import WorkflowValidationError, normalize_selected_ad_modules
 
 
 class AtlasHTTPServer(ThreadingHTTPServer):
@@ -86,14 +88,19 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
             raise IntakeValidationError("request body must be a JSON object")
         return payload
 
-    def _validated_intake_and_context(self):
+    def _validated_workflow_request(self):
         payload = self._read_object()
         if "intake" not in payload:
-            return validate_intake(payload), {}
+            return validate_intake(payload), [], {}
         raw_intake = payload.get("intake")
         raw_context = payload.get("evidence_context", {})
+        selected = normalize_selected_ad_modules(payload.get("selected_ad_modules", []))
         captured_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-        return validate_intake(raw_intake), normalize_evidence_context(raw_context, captured_at)
+        return (
+            validate_intake(raw_intake),
+            selected,
+            normalize_evidence_context(raw_context, captured_at),
+        )
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
@@ -124,23 +131,29 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
         if not self._is_authorized():
             return
         try:
-            intake, _ = self._validated_intake_and_context()
+            intake, _, _ = self._validated_workflow_request()
             self.app_server.storage.save_draft(intake)
             self._send_json(200, intake)
-        except (IntakeValidationError, EvidenceValidationError) as error:
+        except (IntakeValidationError, EvidenceValidationError, WorkflowValidationError) as error:
             self._error(400, "bad_request", str(error))
         except StorageError as error:
             self._error(500, "storage_error", str(error))
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in {"/api/runs", "/api/feasibility", "/api/campaign-architecture", "/api/gates"}:
+        if path not in {
+            "/api/runs",
+            "/api/feasibility",
+            "/api/campaign-architecture",
+            "/api/gates",
+            "/api/demo-report",
+        }:
             self._error(404, "not_found", "The requested local resource does not exist.")
             return
         if not self._is_authorized():
             return
         try:
-            intake, evidence_context = self._validated_intake_and_context()
+            intake, selected_ad_modules, evidence_context = self._validated_workflow_request()
             if path == "/api/feasibility":
                 self._send_json(200, calculate_feasibility(intake))
                 return
@@ -151,7 +164,12 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/campaign-architecture":
                 self._send_json(200, architecture)
                 return
-            gates = evaluate_gates(intake, feasibility, evidence_context)
+            gates = evaluate_gates(
+                intake,
+                feasibility,
+                evidence_context,
+                selected_ad_modules=selected_ad_modules,
+            )
             if path == "/api/gates":
                 self._send_json(200, gates)
                 return
@@ -160,18 +178,29 @@ class WorkbenchRequestHandler(BaseHTTPRequestHandler):
                 "data_source": "seller_input_and_deterministic_rule",
                 "external_data_used": False,
                 "model_calls": 0,
+                "selected_ad_modules": selected_ad_modules,
                 "evidence_context": evidence_context,
                 "feasibility": feasibility,
                 "gates": gates,
                 "campaign_architecture": architecture,
             }
+            if path == "/api/demo-report":
+                demo_report = build_demo_report(feasibility)
+                decision_plan["demo_report"] = demo_report
+                manifest = self.app_server.storage.create_run(
+                    intake,
+                    self.app_server.workbench_version,
+                    decision_plan,
+                )
+                self._send_json(201, {"run": manifest, "report": demo_report})
+                return
             manifest = self.app_server.storage.create_run(
                 intake,
                 self.app_server.workbench_version,
                 decision_plan,
             )
             self._send_json(201, manifest)
-        except (IntakeValidationError, EvidenceValidationError) as error:
+        except (IntakeValidationError, EvidenceValidationError, WorkflowValidationError) as error:
             self._error(400, "bad_request", str(error))
         except StorageError as error:
             self._error(500, "storage_error", str(error))

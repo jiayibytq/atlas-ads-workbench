@@ -75,4 +75,3 @@
 - [ ] Dispatch a Sol whole-branch reviewer with the exact global constraints above.
 - [ ] Fix all Critical/Important findings with one Luna implementation pass where possible, then re-review.
 - [ ] Push the execution branch to the existing draft PR and verify the remote head SHA and checks.
-
